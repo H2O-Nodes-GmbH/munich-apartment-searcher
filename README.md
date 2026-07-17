@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Munich Apartment Searcher
 
-## Getting Started
+Personal Next.js tool that polls [Kleinanzeigen](https://www.kleinanzeigen.de) rental search URLs for Munich, stores new listings in Supabase, filters swap/Untermiete noise, and notifies via Telegram.
 
-First, run the development server:
+## Status
+
+Built so far:
+
+- Supabase schema (`supabase/schema.sql`)
+- Cheerio scraper (selectors verified against live search HTML)
+- Manual test route: `GET /api/scrape/test`
+- Telegram notifier module (wired when env vars are set)
+- Vercel cron stub every 20 min (`/api/cron/poll` — not implemented yet)
+
+Still to build: persist listings, dashboard UI, full cron + notify loop, auth gate.
+
+## Setup
+
+1. Create a Supabase project and run `supabase/schema.sql` in the SQL editor.
+2. `cp .env.example .env.local` and fill values.
+3. `npm install && npm run dev`
+
+### Scrape test (no DB writes)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Dev: auth is open if CRON_SECRET is unset
+curl -s "http://localhost:3000/api/scrape/test" | jq '.listingCount, .listings[0]'
+
+# With your own search URL + exclusion preview
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  "http://localhost:3000/api/scrape/test?applyExclude=1&url=$(python3 -c 'import urllib.parse; print(urllib.parse.quote(\"YOUR_SEARCH_URL\", safe=\"\"))')" \
+  | jq '{listingCount, excluded: [.listings[] | select(.isExcluded)] | length, sample: .listings[0]}'
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The scraper appends `sortingField=SORTING_DATE` so posted timestamps (`Heute, 20:57`, etc.) appear on cards.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Telegram
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Message [@BotFather](https://t.me/BotFather) → create a bot → copy token → `TELEGRAM_BOT_TOKEN`
+2. Message the bot, then get your chat id (`TELEGRAM_CHAT_ID`) via `https://api.telegram.org/bot<token>/getUpdates`
 
-## Learn More
+### Exclude terms
 
-To learn more about Next.js, take a look at the following resources:
+Seeded in SQL (edit in Supabase anytime):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`tausch`, `swap`, `tauschwohnung`, `wohnungstausch`, `tauschobjekt`, `mietertausch`, `untermiete`, `zwischenmiete`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Möbliert is **not** excluded. Matched listings are stored with `is_excluded = true`, not dropped.
 
-## Deploy on Vercel
+## Project layout
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/lib/scraper/     # fetch + parse — update parseListings.ts when markup changes
+src/lib/notifications/  # TelegramNotifier (+ Notifier interface for later channels)
+src/app/api/scrape/test  # manual scrape smoke test
+supabase/schema.sql
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy
+
+Vercel Pro supports the 20-minute cron in `vercel.json`. Set the same env vars in the Vercel project. Protect cron with `CRON_SECRET` (Vercel sends `Authorization: Bearer $CRON_SECRET`).
