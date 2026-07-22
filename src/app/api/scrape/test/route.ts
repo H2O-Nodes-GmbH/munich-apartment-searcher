@@ -18,6 +18,10 @@ const SEED_EXCLUDE_TERMS = [
   "mietertausch",
   "untermiete",
   "zwischenmiete",
+  "wg",
+  "wohngemeinschaft",
+  "gesucht",
+  "gesuch",
 ];
 
 /**

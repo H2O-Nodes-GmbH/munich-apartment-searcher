@@ -25,7 +25,11 @@ insert into exclude_terms (term) values
   ('tauschobjekt'),
   ('mietertausch'),
   ('untermiete'),
-  ('zwischenmiete')
+  ('zwischenmiete'),
+  ('wg'),
+  ('wohngemeinschaft'),
+  ('gesucht'),
+  ('gesuch')
 on conflict (term) do nothing;
 
 do $$ begin
