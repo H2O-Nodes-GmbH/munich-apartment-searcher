@@ -1,4 +1,5 @@
 import { AddSearchForm } from "@/components/AddSearchForm";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ExcludeTermsPanel } from "@/components/ExcludeTermsPanel";
 import { FilterBar, type DashboardFilters } from "@/components/FilterBar";
 import { ListingCard } from "@/components/ListingCard";
@@ -107,8 +108,11 @@ export default async function HomePage({
         </p>
       </header>
 
-      <section className="space-y-4 rounded-xl bg-card p-5 shadow-sm ring-1 ring-black/5">
-        <h2 className="text-lg font-medium">Saved searches</h2>
+      <CollapsibleSection
+        title="Saved searches"
+        description="Kleinanzeigen URLs polled every 20 minutes."
+        badge={`${searchRows.filter((s) => s.active).length} active`}
+      >
         {searchRows.length === 0 ? (
           <p className="text-sm text-muted">
             Add a Kleinanzeigen search URL to start polling.
@@ -121,7 +125,7 @@ export default async function HomePage({
           </ul>
         )}
         <AddSearchForm />
-      </section>
+      </CollapsibleSection>
 
       <ExcludeTermsPanel terms={excludeTerms} />
 

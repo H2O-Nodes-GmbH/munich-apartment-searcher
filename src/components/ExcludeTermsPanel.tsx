@@ -1,18 +1,13 @@
 import { excludeTermHint } from "@/lib/exclude-labels";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 export function ExcludeTermsPanel({ terms }: { terms: string[] }) {
   return (
-    <section className="space-y-3 rounded-xl bg-card p-5 shadow-sm ring-1 ring-black/5">
-      <div>
-        <h2 className="text-lg font-medium">Excluded words</h2>
-        <p className="mt-1 text-sm text-muted">
-          Listings whose title or description matches any of these are still
-          saved but hidden by default and never sent to Telegram. Edit in
-          Supabase{" "}
-          <code className="font-mono text-xs">exclude_terms</code>.
-        </p>
-      </div>
-
+    <CollapsibleSection
+      title="Excluded words"
+      description="Hidden from the dashboard and Telegram when matched in title or description."
+      badge={`${terms.length} term${terms.length === 1 ? "" : "s"}`}
+    >
       {terms.length === 0 ? (
         <p className="text-sm text-muted">No exclude terms configured.</p>
       ) : (
@@ -35,9 +30,10 @@ export function ExcludeTermsPanel({ terms }: { terms: string[] }) {
       )}
 
       <p className="text-xs text-muted">
-        Keeps: möbliert listings · Excludes: swap/tausch, Untermiete,
-        Zwischenmiete, WG, Gesuch wanted ads. “Mieter gesucht” offers are kept.
+        Edit in Supabase <code className="font-mono">exclude_terms</code>. Keeps:
+        möbliert · Excludes: swap/tausch, Untermiete, Zwischenmiete, WG, Gesuch.
+        “Mieter gesucht” offers are kept.
       </p>
-    </section>
+    </CollapsibleSection>
   );
 }
