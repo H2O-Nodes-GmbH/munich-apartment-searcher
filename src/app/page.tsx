@@ -1,6 +1,8 @@
 import { AddSearchForm } from "@/components/AddSearchForm";
+import { ExcludeTermsPanel } from "@/components/ExcludeTermsPanel";
 import { FilterBar, type DashboardFilters } from "@/components/FilterBar";
 import { ListingCard } from "@/components/ListingCard";
+import { SearchConfigCard } from "@/components/SearchConfigCard";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { ListingRow, SearchConfigRow } from "@/lib/types";
 
@@ -30,6 +32,11 @@ export default async function HomePage({
     .from("search_configs")
     .select("*")
     .order("created_at", { ascending: true });
+
+  const { data: excludeTermRows } = await supabase
+    .from("exclude_terms")
+    .select("term")
+    .order("term", { ascending: true });
 
   if (searchError) {
     return (
@@ -82,6 +89,7 @@ export default async function HomePage({
 
   const searchRows = (searches ?? []) as SearchConfigRow[];
   const listingRows = (listings ?? []) as ListingRow[];
+  const excludeTerms = (excludeTermRows ?? []).map((row) => row.term as string);
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-10 px-6 py-10">
@@ -106,28 +114,16 @@ export default async function HomePage({
             Add a Kleinanzeigen search URL to start polling.
           </p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="space-y-3">
             {searchRows.map((s) => (
-              <li
-                key={s.id}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-2"
-              >
-                <div>
-                  <span className="font-medium">{s.name}</span>
-                  <span className="text-muted">
-                    {" "}
-                    · {s.active ? "active" : "paused"}
-                    {s.last_polled_at
-                      ? ` · last poll ${new Date(s.last_polled_at).toLocaleString("de-DE")}`
-                      : " · never polled"}
-                  </span>
-                </div>
-              </li>
+              <SearchConfigCard key={s.id} search={s} />
             ))}
           </ul>
         )}
         <AddSearchForm />
       </section>
+
+      <ExcludeTermsPanel terms={excludeTerms} />
 
       <section className="space-y-4">
         <FilterBar
