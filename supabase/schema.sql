@@ -63,3 +63,10 @@ create index if not exists listings_price_eur_idx on listings (price_eur);
 alter table search_configs enable row level security;
 alter table exclude_terms enable row level security;
 alter table listings enable row level security;
+
+-- Needed when "Automatically expose new tables" is disabled at project create.
+grant usage on schema public to postgres, anon, authenticated, service_role;
+grant all on table public.search_configs to service_role;
+grant all on table public.exclude_terms to service_role;
+grant all on table public.listings to service_role;
+grant usage, select on all sequences in schema public to service_role;

@@ -1,3 +1,4 @@
+import ws from "ws";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let cached: SupabaseClient | null = null;
@@ -20,6 +21,10 @@ export function getServiceSupabase(): SupabaseClient {
 
   cached = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    realtime: {
+      // Node < 22 has no global WebSocket; we don't use realtime anyway.
+      transport: ws as unknown as typeof WebSocket,
+    },
   });
   return cached;
 }

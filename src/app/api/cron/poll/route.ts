@@ -1,15 +1,28 @@
 import { NextResponse } from "next/server";
+import { isAuthorized } from "@/lib/auth";
+import { pollActiveSearches } from "@/lib/poll";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /**
- * Placeholder — wired up after scrape + DB persistence are confirmed.
- * Protected by CRON_SECRET once implemented.
+ * Vercel Cron + manual trigger.
+ * Auth: Authorization: Bearer <CRON_SECRET>
  */
-export async function GET() {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: "Poll cron not implemented yet. Use /api/scrape/test first.",
-    },
-    { status: 501 },
-  );
+export async function GET(request: Request) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const summary = await pollActiveSearches({ notify: true });
+    return NextResponse.json({
+      ok: true,
+      polledAt: new Date().toISOString(),
+      ...summary,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
 }
