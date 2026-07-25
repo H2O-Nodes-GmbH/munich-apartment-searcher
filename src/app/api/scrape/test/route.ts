@@ -22,6 +22,8 @@ const SEED_EXCLUDE_TERMS = [
   "wohngemeinschaft",
   "gesucht",
   "gesuch",
+  "suchen",
+  "suche",
 ];
 
 /**

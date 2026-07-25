@@ -12,6 +12,8 @@ export const EXCLUDE_TERM_HINTS: Record<string, string> = {
   wohngemeinschaft: "Wohngemeinschaft",
   gesucht: "Wanted ads — someone seeking a flat",
   gesuch: "Gesuch wanted ads",
+  suchen: "Wanted ads starting with Suchen/Suche",
+  suche: "Wanted ads (Suche …)",
 };
 
 export function excludeTermHint(term: string): string | null {

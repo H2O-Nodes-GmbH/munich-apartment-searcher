@@ -13,8 +13,10 @@ const CUSTOM_TERM_MATCHERS: Record<
   string,
   (listing: Pick<ParsedListing, "title" | "descriptionSnippet">) => boolean
 > = {
-  gesucht: (listing) => matchesHousingWantedAd(listing.title),
-  gesuch: (listing) => matchesHousingWantedAd(listing.title),
+  gesucht: (listing) => matchesHousingWantedAd(listing.title, "gesucht"),
+  gesuch: (listing) => matchesHousingWantedAd(listing.title, "gesuch"),
+  suchen: (listing) => matchesHousingWantedAd(listing.title, "suchen"),
+  suche: (listing) => matchesHousingWantedAd(listing.title, "suche"),
 };
 
 /**
@@ -51,21 +53,52 @@ function termMatches(
   return haystack.toLowerCase().includes(normalized);
 }
 
+type WantedFlavor = "gesucht" | "gesuch" | "suchen" | "suche";
+
 /**
- * Kleinanzeigen "Gesuch" = someone looking for a flat (not offering one).
- * Keeps legitimate offers like "Mieter gesucht" / "Nachmieter gesucht".
+ * Kleinanzeigen wanted ads — someone looking for a flat (not offering one).
+ * Titles like "Suchen 2 Zimmer…" / "Wohnung gesucht".
+ * Keeps landlord offers like "Mieter gesucht" / "Wir suchen Nachmieter".
  */
-export function matchesHousingWantedAd(title: string): boolean {
+export function matchesHousingWantedAd(
+  title: string,
+  flavor: WantedFlavor = "gesucht",
+): boolean {
   const t = title.trim().toLowerCase();
   if (!t) return false;
 
-  if (/\b(mieter|nachmieter|untermieter|mitbewohner)\s+gesucht\b/.test(t)) {
+  if (
+    /\b(mieter|nachmieter|untermieter|mitbewohner)\s+(gesucht|suchen|suche)\b/.test(
+      t,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /\b(suchen|suche)\s+(mieter|nachmieter|untermieter|mitbewohner|nachfolger)\b/.test(
+      t,
+    )
+  ) {
     return false;
   }
 
-  if (/^(gesucht|gesuch)\b/.test(t)) return true;
-  if (/\b(wohnung|whg|apartment|zimmer)\s+gesucht\b/.test(t)) return true;
-  if (/\bgesucht\b/.test(t) && /\bbelohnung\b/.test(t)) return true;
+  const startsWith: Record<WantedFlavor, RegExp> = {
+    gesucht: /^(gesucht)\b/,
+    gesuch: /^(gesuch)\b/,
+    suchen: /^(suchen)\b/,
+    suche: /^(suche)\b/,
+  };
+  if (startsWith[flavor].test(t)) return true;
+
+  if (flavor === "gesucht" || flavor === "gesuch") {
+    if (/\b(wohnung|whg|apartment|zimmer)\s+gesucht\b/.test(t)) return true;
+    if (/\bgesucht\b/.test(t) && /\bbelohnung\b/.test(t)) return true;
+  }
+  if (flavor === "suchen" || flavor === "suche") {
+    if (/\b(wohnung|whg|apartment|zimmer)\s+(suchen|suche)\b/.test(t)) {
+      return true;
+    }
+  }
 
   return false;
 }

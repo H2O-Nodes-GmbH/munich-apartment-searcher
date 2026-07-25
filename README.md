@@ -45,7 +45,7 @@ The scraper appends `sortingField=SORTING_DATE` so posted timestamps (`Heute, 20
 
 Seeded in SQL (edit in Supabase anytime):
 
-`tausch`, `swap`, `tauschwohnung`, `wohnungstausch`, `tauschobjekt`, `mietertausch`, `untermiete`, `zwischenmiete`
+`tausch`, `swap`, `tauschwohnung`, `wohnungstausch`, `tauschobjekt`, `mietertausch`, `untermiete`, `zwischenmiete`, `wg`, `wohngemeinschaft`, `gesucht`, `gesuch`, `suchen`, `suche`
 
 Möbliert is **not** excluded. Matched listings are stored with `is_excluded = true`, not dropped.
 

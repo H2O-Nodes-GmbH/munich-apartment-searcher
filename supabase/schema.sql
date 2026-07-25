@@ -29,7 +29,9 @@ insert into exclude_terms (term) values
   ('wg'),
   ('wohngemeinschaft'),
   ('gesucht'),
-  ('gesuch')
+  ('gesuch'),
+  ('suchen'),
+  ('suche')
 on conflict (term) do nothing;
 
 do $$ begin

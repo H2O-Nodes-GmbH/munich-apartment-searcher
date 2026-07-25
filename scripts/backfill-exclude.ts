@@ -18,6 +18,8 @@ async function main() {
       { term: "wohngemeinschaft" },
       { term: "gesucht" },
       { term: "gesuch" },
+      { term: "suchen" },
+      { term: "suche" },
     ],
     { onConflict: "term", ignoreDuplicates: true },
   );
