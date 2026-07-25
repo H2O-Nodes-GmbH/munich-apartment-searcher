@@ -37,7 +37,9 @@ The scraper appends `sortingField=SORTING_DATE` so posted timestamps (`Heute, 20
 ### Telegram
 
 1. Message [@BotFather](https://t.me/BotFather) → create a bot → copy token → `TELEGRAM_BOT_TOKEN`
-2. Message the bot, then get your chat id (`TELEGRAM_CHAT_ID`) via `https://api.telegram.org/bot<token>/getUpdates`
+2. Add the bot to a shared group (recommended) or DM it
+3. Set `TELEGRAM_CHAT_ID` to that chat id (group ids look like `-100…`). Get it via `https://api.telegram.org/bot<token>/getUpdates` after sending a message in the chat
+4. Optional: comma-separate multiple ids to notify a group and DMs at once
 
 ### Exclude terms
 

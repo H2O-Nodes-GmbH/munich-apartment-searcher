@@ -17,27 +17,35 @@ export interface Notifier {
 export class TelegramNotifier implements Notifier {
   constructor(
     private readonly botToken: string,
-    private readonly chatId: string,
+    private readonly chatIds: string[],
   ) {}
 
   async notifyNewListings(listings: NotifiableListing[]): Promise<void> {
-    if (listings.length === 0) return;
+    if (listings.length === 0 || this.chatIds.length === 0) return;
 
     // Telegram message limit ~4096 chars; send in chunks of ~8 listings.
     const chunkSize = 8;
     for (let i = 0; i < listings.length; i += chunkSize) {
       const chunk = listings.slice(i, i + chunkSize);
       const text = formatTelegramMessage(chunk);
-      await sendTelegramMessage(this.botToken, this.chatId, text);
+      for (const chatId of this.chatIds) {
+        await sendTelegramMessage(this.botToken, chatId, text);
+      }
     }
   }
 }
 
+/** Parse TELEGRAM_CHAT_ID — single id or comma-separated (DMs and/or groups). */
+export function parseTelegramChatIds(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return [...new Set(raw.split(",").map((id) => id.trim()).filter(Boolean))];
+}
+
 export function createNotifierFromEnv(): Notifier | null {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!botToken || !chatId) return null;
-  return new TelegramNotifier(botToken, chatId);
+  const chatIds = parseTelegramChatIds(process.env.TELEGRAM_CHAT_ID);
+  if (!botToken || chatIds.length === 0) return null;
+  return new TelegramNotifier(botToken, chatIds);
 }
 
 function formatTelegramMessage(listings: NotifiableListing[]): string {
