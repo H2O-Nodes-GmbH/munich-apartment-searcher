@@ -1,3 +1,11 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import {
+  deleteSearchConfig,
+  setSearchConfigActive,
+} from "@/app/actions";
 import {
   formatSearchFilterChips,
   parseKleinanzeigenSearchUrl,
@@ -5,8 +13,23 @@ import {
 import type { SearchConfigRow } from "@/lib/types";
 
 export function SearchConfigCard({ search }: { search: SearchConfigRow }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const parsed = parseKleinanzeigenSearchUrl(search.search_url);
   const chips = formatSearchFilterChips(parsed);
+
+  function run(action: () => Promise<void>) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await action();
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Action failed");
+      }
+    });
+  }
 
   return (
     <li className="space-y-3 rounded-lg border border-black/5 bg-white/60 p-4">
@@ -57,6 +80,37 @@ export function SearchConfigCard({ search }: { search: SearchConfigRow }) {
         <code className="font-mono">sortingField=SORTING_DATE</code> appended if
         missing).
       </p>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            run(() => setSearchConfigActive(search.id, !search.active))
+          }
+          className="rounded-md border border-black/10 bg-white px-3 py-1.5 text-sm disabled:opacity-60"
+        >
+          {search.active ? "Pause" : "Resume"}
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            if (
+              !window.confirm(
+                `Remove “${search.name}”? Existing listings stay; only polling stops.`,
+              )
+            ) {
+              return;
+            }
+            run(() => deleteSearchConfig(search.id));
+          }}
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-800 disabled:opacity-60"
+        >
+          Remove
+        </button>
+      </div>
+      {error ? <p className="text-sm text-red-700">{error}</p> : null}
     </li>
   );
 }

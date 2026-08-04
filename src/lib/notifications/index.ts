@@ -12,6 +12,7 @@ export type NotifiableListing = {
 
 export interface Notifier {
   notifyNewListings(listings: NotifiableListing[]): Promise<void>;
+  notifyMessage(text: string): Promise<void>;
 }
 
 export class TelegramNotifier implements Notifier {
@@ -28,9 +29,14 @@ export class TelegramNotifier implements Notifier {
     for (let i = 0; i < listings.length; i += chunkSize) {
       const chunk = listings.slice(i, i + chunkSize);
       const text = formatTelegramMessage(chunk);
-      for (const chatId of this.chatIds) {
-        await sendTelegramMessage(this.botToken, chatId, text);
-      }
+      await this.notifyMessage(text);
+    }
+  }
+
+  async notifyMessage(text: string): Promise<void> {
+    if (!text.trim() || this.chatIds.length === 0) return;
+    for (const chatId of this.chatIds) {
+      await sendTelegramMessage(this.botToken, chatId, text);
     }
   }
 }
@@ -46,6 +52,23 @@ export function createNotifierFromEnv(): Notifier | null {
   const chatIds = parseTelegramChatIds(process.env.TELEGRAM_CHAT_ID);
   if (!botToken || chatIds.length === 0) return null;
   return new TelegramNotifier(botToken, chatIds);
+}
+
+export function formatSearchChangeMessage(input: {
+  action: "added" | "removed";
+  name: string;
+  searchUrl: string;
+  filtersSummary: string;
+}): string {
+  const verb = input.action === "added" ? "added" : "removed";
+  const emoji = input.action === "added" ? "✅" : "🗑️";
+  return [
+    `${emoji} <b>Search ${verb}</b>`,
+    "",
+    `<b>${escapeHtml(input.name)}</b>`,
+    escapeHtml(input.filtersSummary),
+    `<a href="${escapeHtml(input.searchUrl)}">Open search</a>`,
+  ].join("\n");
 }
 
 function formatTelegramMessage(listings: NotifiableListing[]): string {
