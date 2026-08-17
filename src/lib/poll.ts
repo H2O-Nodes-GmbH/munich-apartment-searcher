@@ -94,6 +94,7 @@ export async function pollActiveSearches(options?: {
             url: row.url,
             postedText: row.posted_text,
             availableFrom: null,
+            thumbnailUrl: row.thumbnail_url,
           });
         }
       }
