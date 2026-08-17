@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/poll",
       "schedule": "*/20 * * * *"
+    },
+    {
+      "path": "/api/cron/horoscope",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/horoscope",
+      "schedule": "0 20 * * *"
     }
   ]
 }

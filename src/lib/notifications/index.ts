@@ -81,6 +81,21 @@ export function createNotifierFromEnv(): Notifier | null {
   return new TelegramNotifier(botToken, chatIds);
 }
 
+export type HoroscopeEntry = {
+  name: string;
+  signLabel: string;
+  emoji: string;
+  text: string;
+};
+
+export function formatHoroscopeMessage(entries: HoroscopeEntry[]): string {
+  const blocks = entries.map(
+    (e) =>
+      `${e.emoji} <b>${escapeHtml(e.signLabel)} (${escapeHtml(e.name)})</b>\n${escapeHtml(e.text)}`,
+  );
+  return ["🔮 <b>Daily Horoscope</b>", "", blocks.join("\n\n")].join("\n");
+}
+
 export function formatSearchChangeMessage(input: {
   action: "added" | "removed";
   name: string;
