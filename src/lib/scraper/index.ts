@@ -1,4 +1,5 @@
-import { fetchSearchPage, sleep } from "./fetchSearchPage";
+import { fetchListingPage, fetchSearchPage, sleep } from "./fetchSearchPage";
+import { parseAvailableFrom } from "./parseListingDetails";
 import { parseListings } from "./parseListings";
 import type { ParsedListing } from "./types";
 
@@ -47,6 +48,37 @@ export async function scrapeSearchUrl(
   };
 }
 
+export type ListingDetails = {
+  availableFrom: string | null;
+};
+
+/**
+ * Fetch + parse fields only present on the listing detail page
+ * (e.g. Verfügbar ab). Best-effort — returns nulls on failure.
+ */
+export async function scrapeListingDetails(
+  url: string,
+  options: ScrapeSearchUrlOptions = {},
+): Promise<ListingDetails> {
+  if (options.delayMs && options.delayMs > 0) {
+    await sleep(options.delayMs);
+  }
+
+  try {
+    const { html, status } = await fetchListingPage(url);
+    if (status !== 200) return { availableFrom: null };
+    return { availableFrom: parseAvailableFrom(html) };
+  } catch {
+    return { availableFrom: null };
+  }
+}
+
 export { parseListings, parsePriceEur, parsePostedAt } from "./parseListings";
-export { fetchSearchPage, ensureDateSort, sleep } from "./fetchSearchPage";
+export { parseAvailableFrom } from "./parseListingDetails";
+export {
+  fetchSearchPage,
+  fetchListingPage,
+  ensureDateSort,
+  sleep,
+} from "./fetchSearchPage";
 export type { ParsedListing } from "./types";

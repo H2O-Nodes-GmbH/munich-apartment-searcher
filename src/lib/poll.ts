@@ -3,12 +3,13 @@ import {
   createNotifierFromEnv,
   type NotifiableListing,
 } from "@/lib/notifications";
-import { scrapeSearchUrl } from "@/lib/scraper";
+import { scrapeListingDetails, scrapeSearchUrl } from "@/lib/scraper";
 import type { ParsedListing } from "@/lib/scraper/types";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { ListingRow, SearchConfigRow } from "@/lib/types";
 
 const DEFAULT_DELAY_MS = 3_000;
+const DETAIL_DELAY_MS = 1_500;
 
 export type PollSummary = {
   searched: number;
@@ -92,6 +93,7 @@ export async function pollActiveSearches(options?: {
             location: row.location,
             url: row.url,
             postedText: row.posted_text,
+            availableFrom: null,
           });
         }
       }
@@ -110,6 +112,7 @@ export async function pollActiveSearches(options?: {
   }
 
   if (shouldNotify && newlyInsertedForNotify.length > 0) {
+    await enrichAvailableFrom(newlyInsertedForNotify);
     const notifier = createNotifierFromEnv();
     if (notifier) {
       await notifier.notifyNewListings(newlyInsertedForNotify);
@@ -118,6 +121,19 @@ export async function pollActiveSearches(options?: {
   }
 
   return summary;
+}
+
+/** Best-effort: pull Verfügbar ab from each listing detail page before notify. */
+async function enrichAvailableFrom(
+  listings: NotifiableListing[],
+): Promise<void> {
+  for (let i = 0; i < listings.length; i++) {
+    const listing = listings[i];
+    const details = await scrapeListingDetails(listing.url, {
+      delayMs: i === 0 ? 0 : DETAIL_DELAY_MS,
+    });
+    listing.availableFrom = details.availableFrom;
+  }
 }
 
 async function persistListings(args: {

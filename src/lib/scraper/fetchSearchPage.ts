@@ -1,26 +1,23 @@
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-export type FetchSearchPageOptions = {
+export type FetchPageOptions = {
   userAgent?: string;
   timeoutMs?: number;
 };
 
-/**
- * Fetches a Kleinanzeigen search results page with a browser-like User-Agent.
- * Prefer search URLs sorted by date so posted timestamps are present:
- *   ...&sortingField=SORTING_DATE
- */
-export async function fetchSearchPage(
+export type FetchSearchPageOptions = FetchPageOptions;
+
+async function fetchKleinanzeigenPage(
   url: string,
-  options: FetchSearchPageOptions = {},
+  options: FetchPageOptions = {},
 ): Promise<{ html: string; finalUrl: string; status: number }> {
   const controller = new AbortController();
   const timeoutMs = options.timeoutMs ?? 25_000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(ensureDateSort(url), {
+    const response = await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
       headers: {
@@ -42,6 +39,26 @@ export async function fetchSearchPage(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Fetches a Kleinanzeigen search results page with a browser-like User-Agent.
+ * Prefer search URLs sorted by date so posted timestamps are present:
+ *   ...&sortingField=SORTING_DATE
+ */
+export async function fetchSearchPage(
+  url: string,
+  options: FetchSearchPageOptions = {},
+): Promise<{ html: string; finalUrl: string; status: number }> {
+  return fetchKleinanzeigenPage(ensureDateSort(url), options);
+}
+
+/** Fetches a single listing detail page (for attributes like Verfügbar ab). */
+export async function fetchListingPage(
+  url: string,
+  options: FetchPageOptions = {},
+): Promise<{ html: string; finalUrl: string; status: number }> {
+  return fetchKleinanzeigenPage(url, options);
 }
 
 /** Append sortingField=SORTING_DATE if not already present. */

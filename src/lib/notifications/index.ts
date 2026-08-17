@@ -8,6 +8,8 @@ export type NotifiableListing = {
   location: string | null;
   url: string;
   postedText: string | null;
+  /** Move-in date from listing details, e.g. "September 2026" or "01.10.2026" */
+  availableFrom: string | null;
 };
 
 export interface Notifier {
@@ -72,21 +74,23 @@ export function formatSearchChangeMessage(input: {
 }
 
 function formatTelegramMessage(listings: NotifiableListing[]): string {
-  const header =
-    listings.length === 1
-      ? "🏠 New Munich listing"
-      : `🏠 ${listings.length} new Munich listings`;
-
-  const body = listings
+  return listings
     .map((l) => {
       const price = l.priceText ?? "—";
       const loc = l.location ?? "—";
       const when = l.postedText ? ` · ${l.postedText}` : "";
-      return `<b>${escapeHtml(l.title)}</b>\n${escapeHtml(price)} · ${escapeHtml(loc)}${escapeHtml(when)}\n<a href="${escapeHtml(l.url)}">Open listing</a>`;
+      const availableLabel = l.availableFrom
+        ? escapeHtml(l.availableFrom)
+        : "nicht angegeben";
+      return [
+        `📅 <b>Verfügbar ab: ${availableLabel}</b>`,
+        "",
+        `<b>${escapeHtml(l.title)}</b>`,
+        `${escapeHtml(price)} · ${escapeHtml(loc)}${escapeHtml(when)}`,
+        `<a href="${escapeHtml(l.url)}">Open listing</a>`,
+      ].join("\n");
     })
     .join("\n\n");
-
-  return `${header}\n\n${body}`;
 }
 
 async function sendTelegramMessage(
