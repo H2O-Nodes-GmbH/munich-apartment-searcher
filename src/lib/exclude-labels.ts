@@ -14,6 +14,8 @@ export const EXCLUDE_TERM_HINTS: Record<string, string> = {
   gesuch: "Gesuch wanted ads",
   suchen: "Wanted ads starting with Suchen/Suche",
   suche: "Wanted ads (Suche …)",
+  wiesn: "Oktoberfest short-term sublets",
+  oktoberfest: "Oktoberfest short-term sublets",
 };
 
 export function excludeTermHint(term: string): string | null {
