@@ -9,7 +9,7 @@ export type ScrapeResult = {
   status: number;
   listingCount: number;
   listings: ParsedListing[];
-  /** True when HTML has no article.aditem — often a block/challenge page */
+  /** True when HTML has no listing cards — often a block/challenge page */
   likelyBlocked: boolean;
 };
 
@@ -34,9 +34,7 @@ export async function scrapeSearchUrl(
   const listings = parseListings(html);
   const likelyBlocked =
     status !== 200 ||
-    (listings.length === 0 &&
-      !html.includes("article") &&
-      !html.includes("aditem"));
+    (listings.length === 0 && !html.includes("data-adid"));
 
   return {
     url,
