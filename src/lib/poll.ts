@@ -5,6 +5,10 @@ import {
 } from "@/lib/notifications";
 import { scrapeListingDetails, scrapeSearchUrl } from "@/lib/scraper";
 import type { ParsedListing } from "@/lib/scraper/types";
+import {
+  isSellerAccountTooNew,
+  NEW_SELLER_EXCLUDE_TERM,
+} from "@/lib/sellerAge";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { ListingRow, SearchConfigRow } from "@/lib/types";
 
@@ -54,7 +58,7 @@ export async function pollActiveSearches(options?: {
     errors: [],
   };
 
-  const newlyInsertedForNotify: NotifiableListing[] = [];
+  const newlyInsertedForNotify: PendingNotify[] = [];
   const searchConfigs = (configs ?? []) as SearchConfigRow[];
 
   for (let i = 0; i < searchConfigs.length; i++) {
@@ -88,6 +92,7 @@ export async function pollActiveSearches(options?: {
       for (const row of persist.inserted) {
         if (!row.is_excluded) {
           newlyInsertedForNotify.push({
+            id: row.id,
             title: row.title,
             priceText: row.price_text,
             location: row.location,
@@ -112,29 +117,61 @@ export async function pollActiveSearches(options?: {
     }
   }
 
-  if (shouldNotify && newlyInsertedForNotify.length > 0) {
-    await enrichAvailableFrom(newlyInsertedForNotify);
-    const notifier = createNotifierFromEnv();
-    if (notifier) {
-      await notifier.notifyNewListings(newlyInsertedForNotify);
-      summary.notified = newlyInsertedForNotify.length;
+  if (newlyInsertedForNotify.length > 0) {
+    const toNotify = await enrichAndFilterSellers(newlyInsertedForNotify);
+    summary.excludedNew += newlyInsertedForNotify.length - toNotify.length;
+    if (shouldNotify && toNotify.length > 0) {
+      const notifier = createNotifierFromEnv();
+      if (notifier) {
+        await notifier.notifyNewListings(toNotify);
+        summary.notified = toNotify.length;
+      }
     }
   }
 
   return summary;
 }
 
-/** Best-effort: pull Verfügbar ab from each listing detail page before notify. */
-async function enrichAvailableFrom(
-  listings: NotifiableListing[],
-): Promise<void> {
+type PendingNotify = NotifiableListing & { id: string };
+
+/**
+ * Pull Verfügbar ab + seller "Aktiv seit" from each listing detail page.
+ * Brand-new seller accounts are flagged excluded and dropped from Telegram.
+ */
+async function enrichAndFilterSellers(
+  listings: PendingNotify[],
+): Promise<NotifiableListing[]> {
+  const supabase = getServiceSupabase();
+  const kept: NotifiableListing[] = [];
+
   for (let i = 0; i < listings.length; i++) {
     const listing = listings[i];
     const details = await scrapeListingDetails(listing.url, {
       delayMs: i === 0 ? 0 : DETAIL_DELAY_MS,
     });
     listing.availableFrom = details.availableFrom;
+
+    if (isSellerAccountTooNew(details.sellerActiveSince)) {
+      const { data: existing } = await supabase
+        .from("listings")
+        .select("matched_exclude_terms")
+        .eq("id", listing.id)
+        .maybeSingle();
+      const prior = (existing?.matched_exclude_terms as string[] | undefined) ?? [];
+      const matched = [...new Set([...prior, NEW_SELLER_EXCLUDE_TERM])];
+      await supabase
+        .from("listings")
+        .update({ is_excluded: true, matched_exclude_terms: matched })
+        .eq("id", listing.id);
+      continue;
+    }
+
+    const { id: _id, ...payload } = listing;
+    void _id;
+    kept.push(payload);
   }
+
+  return kept;
 }
 
 async function persistListings(args: {

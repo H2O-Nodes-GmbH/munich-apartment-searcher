@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { StatusSelect } from "@/components/StatusSelect";
+import { excludeTermHint } from "@/lib/exclude-labels";
 import type { ListingRow } from "@/lib/types";
 
 export function ListingCard({ listing }: { listing: ListingRow }) {
@@ -48,7 +49,10 @@ export function ListingCard({ listing }: { listing: ListingRow }) {
 
         {listing.is_excluded ? (
           <p className="text-xs font-medium text-amber-800">
-            Excluded: {listing.matched_exclude_terms.join(", ")}
+            Excluded:{" "}
+            {listing.matched_exclude_terms
+              .map((term) => excludeTermHint(term) ?? term)
+              .join(", ")}
           </p>
         ) : null}
       </div>
