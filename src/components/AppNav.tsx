@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-export function AppNav({ active }: { active: "inbox" | "pipeline" }) {
+export function AppNav({
+  active,
+}: {
+  active: "inbox" | "pipeline" | "system";
+}) {
   const linkClass = (isActive: boolean) =>
     isActive
       ? "rounded-md bg-stone-900 px-3 py-1.5 text-sm font-medium text-white"
@@ -13,6 +17,9 @@ export function AppNav({ active }: { active: "inbox" | "pipeline" }) {
       </Link>
       <Link href="/" className={linkClass(active === "inbox")}>
         Inbox
+      </Link>
+      <Link href="/system" className={linkClass(active === "system")}>
+        System
       </Link>
     </nav>
   );

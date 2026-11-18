@@ -9,6 +9,8 @@ export type ListingStatus =
   | "won"
   | "lost";
 
+export type SendStatus = "queued" | "sending" | "sent" | "failed" | "skipped";
+
 export type SearchConfigRow = {
   id: string;
   name: string;
@@ -37,6 +39,11 @@ export type ListingRow = {
   stage_changed_at: string | null;
   notes: string | null;
   viewing_at: string | null;
+  message_body: string | null;
+  send_status: SendStatus | null;
+  send_error: string | null;
+  sent_at: string | null;
+  replied_at: string | null;
   first_seen_at: string;
   last_seen_at: string;
 };

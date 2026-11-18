@@ -92,10 +92,16 @@ export async function POST(request: Request) {
 
   const row = listing as ListingRow;
   const advance = ADVANCE_TO_REPLIED.includes(row.status);
-  if (advance) {
+  const now = new Date().toISOString();
+  {
+    const patch: Record<string, string> = { replied_at: now };
+    if (advance) {
+      patch.status = "replied";
+      patch.stage_changed_at = now;
+    }
     const { error: updateError } = await supabase
       .from("listings")
-      .update({ status: "replied", stage_changed_at: new Date().toISOString() })
+      .update(patch)
       .eq("id", row.id);
     if (updateError) {
       return NextResponse.json(

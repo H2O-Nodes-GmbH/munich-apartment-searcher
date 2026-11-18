@@ -94,7 +94,7 @@ export default async function HomePage({
   const excludeTerms = (excludeTermRows ?? []).map((row) => row.term as string);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-10 px-6 py-10">
+    <main className="mx-auto flex w-full min-w-0 max-w-3xl flex-1 flex-col gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-10">
       <AppNav active="inbox" />
       <header className="space-y-2">
         <p className="text-sm font-medium tracking-wide text-accent uppercase">

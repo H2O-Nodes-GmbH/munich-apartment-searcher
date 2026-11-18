@@ -16,7 +16,7 @@ Still to build: persist listings, dashboard UI, full cron + notify loop, auth ga
 
 ## Setup
 
-1. Create a Supabase project and run `supabase/schema.sql`, then `supabase/crm.sql`, in the SQL editor.
+1. Create a Supabase project and run `supabase/schema.sql`, then `supabase/crm.sql`, then `supabase/sender.sql`, in the SQL editor.
 2. `cp .env.example .env.local` and fill values.
 3. `npm install && npm run dev`
 

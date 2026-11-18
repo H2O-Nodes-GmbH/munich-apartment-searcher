@@ -5,6 +5,10 @@
       "schedule": "*/20 * * * *"
     },
     {
+      "path": "/api/cron/send",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/horoscope",
       "schedule": "0 19 * * *"
     },

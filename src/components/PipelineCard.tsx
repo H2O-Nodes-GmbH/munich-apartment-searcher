@@ -58,7 +58,7 @@ export function PipelineCard({
   }
 
   return (
-    <article className="flex flex-col gap-2 rounded-lg bg-card p-3 text-sm shadow-sm ring-1 ring-black/5">
+    <article className="flex min-w-0 flex-col gap-2 rounded-lg bg-card p-3 text-sm shadow-sm ring-1 ring-black/5">
       {listing.thumbnail_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -72,7 +72,7 @@ export function PipelineCard({
         href={listing.url}
         target="_blank"
         rel="noreferrer"
-        className="font-medium leading-snug hover:text-accent"
+        className="break-words font-medium leading-snug hover:text-accent"
       >
         {listing.title}
       </a>
@@ -116,7 +116,7 @@ export function PipelineCard({
                   setCopied(true);
                   window.open(listing.url, "_blank", "noreferrer");
                 }}
-                className="rounded-md border border-black/10 bg-white px-2 py-1 text-xs"
+                className="min-h-9 rounded-md border border-black/10 bg-white px-3 py-2 text-xs"
               >
                 {copied ? "Copied ✓" : "Copy & open listing"}
               </button>
@@ -124,7 +124,7 @@ export function PipelineCard({
                 type="button"
                 disabled={pending}
                 onClick={() => move("messaged")}
-                className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-white disabled:opacity-60"
+                className="min-h-9 rounded-md bg-accent px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
               >
                 Mark messaged
               </button>
@@ -187,14 +187,14 @@ export function PipelineCard({
         ) : null}
       </details>
 
-      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         {back ? (
           <button
             type="button"
             disabled={pending}
             onClick={() => move(back)}
             title={`Back to ${stageLabel(back)}`}
-            className="rounded-md border border-black/10 bg-white px-2 py-1 text-xs disabled:opacity-60"
+            className="min-h-9 min-w-9 rounded-md border border-black/10 bg-white px-3 py-2 text-xs disabled:opacity-60"
           >
             ←
           </button>
@@ -204,7 +204,7 @@ export function PipelineCard({
             type="button"
             disabled={pending}
             onClick={() => move(forward)}
-            className="rounded-md bg-stone-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-60"
+            className="min-h-9 rounded-md bg-stone-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
           >
             {stageLabel(forward)} →
           </button>
@@ -213,7 +213,7 @@ export function PipelineCard({
           type="button"
           disabled={pending}
           onClick={() => move("lost")}
-          className="ml-auto rounded-md px-2 py-1 text-xs text-red-800 hover:bg-red-50 disabled:opacity-60"
+          className="ml-auto min-h-9 rounded-md px-3 py-2 text-xs text-red-800 hover:bg-red-50 disabled:opacity-60"
         >
           Lost
         </button>

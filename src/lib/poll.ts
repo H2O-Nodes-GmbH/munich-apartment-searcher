@@ -2,6 +2,7 @@ import { matchExcludeTerms } from "@/lib/exclude";
 import type { NotifiableListing } from "@/lib/notifications";
 import { scrapeListingDetails, scrapeSearchUrl } from "@/lib/scraper";
 import type { ParsedListing } from "@/lib/scraper/types";
+import { queueListingsForSend } from "@/lib/sender/queue";
 import {
   isSellerAccountTooNew,
   NEW_SELLER_EXCLUDE_TERM,
@@ -18,6 +19,7 @@ export type PollSummary = {
   inserted: number;
   updated: number;
   notified: number;
+  queued: number;
   excludedNew: number;
   errors: { searchConfigId: string; name: string; error: string }[];
 };
@@ -49,6 +51,7 @@ export async function pollActiveSearches(options?: {
     inserted: 0,
     updated: 0,
     notified: 0,
+    queued: 0,
     excludedNew: 0,
     errors: [],
   };
@@ -112,10 +115,19 @@ export async function pollActiveSearches(options?: {
     }
   }
 
-  // Still enrich details / drop brand-new seller accounts — no Telegram for new listings.
+  // Enrich details / drop brand-new seller accounts, then auto-queue sends.
   if (newlyInserted.length > 0) {
     const kept = await enrichAndFilterSellers(newlyInserted);
     summary.excludedNew += newlyInserted.length - kept.length;
+    summary.queued = await queueListingsForSend(
+      kept.map((l) => ({
+        id: l.id,
+        title: l.title,
+        price_text: l.priceText,
+        location: l.location,
+        url: l.url,
+      })),
+    );
   }
 
   return summary;
@@ -129,9 +141,9 @@ type PendingNotify = NotifiableListing & { id: string };
  */
 async function enrichAndFilterSellers(
   listings: PendingNotify[],
-): Promise<NotifiableListing[]> {
+): Promise<PendingNotify[]> {
   const supabase = getServiceSupabase();
-  const kept: NotifiableListing[] = [];
+  const kept: PendingNotify[] = [];
 
   for (let i = 0; i < listings.length; i++) {
     const listing = listings[i];
@@ -155,9 +167,7 @@ async function enrichAndFilterSellers(
       continue;
     }
 
-    const { id: _id, ...payload } = listing;
-    void _id;
-    kept.push(payload);
+    kept.push(listing);
   }
 
   return kept;
