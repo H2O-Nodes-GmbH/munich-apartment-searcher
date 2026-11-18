@@ -1,4 +1,13 @@
-export type ListingStatus = "new" | "interested" | "contacted" | "rejected";
+export type ListingStatus =
+  | "new"
+  | "shortlisted"
+  | "messaged"
+  | "replied"
+  | "viewing"
+  | "viewed"
+  | "applied"
+  | "won"
+  | "lost";
 
 export type SearchConfigRow = {
   id: string;
@@ -25,6 +34,17 @@ export type ListingRow = {
   is_excluded: boolean;
   matched_exclude_terms: string[];
   status: ListingStatus;
+  stage_changed_at: string | null;
+  notes: string | null;
+  viewing_at: string | null;
   first_seen_at: string;
   last_seen_at: string;
+};
+
+export type ListingEventRow = {
+  id: string;
+  listing_id: string;
+  kind: string;
+  detail: string | null;
+  created_at: string;
 };

@@ -1,32 +1,25 @@
 import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/auth";
+import { isListingStatus, STATUS_VALUES } from "@/lib/pipeline";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import type { ListingStatus } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const STATUSES: ListingStatus[] = [
-  "new",
-  "interested",
-  "contacted",
-  "rejected",
-];
-
+/** Auth: Bearer CRON_SECRET. The dashboard uses server actions instead. */
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (!isAuthorized(request) && process.env.NODE_ENV === "production") {
-    // Dashboard uses same-origin server actions later; for now allow in dev,
-    // require secret in production unless cookie auth is added.
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await context.params;
-  const body = (await request.json()) as { status?: ListingStatus };
+  const body = (await request.json()) as { status?: unknown };
 
-  if (!body.status || !STATUSES.includes(body.status)) {
+  if (!isListingStatus(body.status)) {
     return NextResponse.json(
-      { error: "status must be one of: " + STATUSES.join(", ") },
+      { error: "status must be one of: " + STATUS_VALUES.join(", ") },
       { status: 400 },
     );
   }
@@ -34,7 +27,7 @@ export async function PATCH(
   const supabase = getServiceSupabase();
   const { data, error } = await supabase
     .from("listings")
-    .update({ status: body.status })
+    .update({ status: body.status, stage_changed_at: new Date().toISOString() })
     .eq("id", id)
     .select("*")
     .single();

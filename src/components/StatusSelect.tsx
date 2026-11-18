@@ -3,14 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { updateListingStatus } from "@/app/actions";
+import { STAGES } from "@/lib/pipeline";
 import type { ListingStatus } from "@/lib/types";
-
-const OPTIONS: { value: ListingStatus; label: string }[] = [
-  { value: "new", label: "New" },
-  { value: "interested", label: "Interested" },
-  { value: "contacted", label: "Contacted" },
-  { value: "rejected", label: "Rejected" },
-];
 
 export function StatusSelect({
   listingId,
@@ -35,7 +29,7 @@ export function StatusSelect({
         });
       }}
     >
-      {OPTIONS.map((opt) => (
+      {STAGES.map((opt) => (
         <option key={opt.value} value={opt.value}>
           {opt.label}
         </option>

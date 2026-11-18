@@ -9,29 +9,92 @@ import {
   createNotifierFromEnv,
   formatSearchChangeMessage,
 } from "@/lib/notifications";
+import {
+  APP_TIME_ZONE,
+  fromBerlinInputValue,
+  isListingStatus,
+  stageLabel,
+} from "@/lib/pipeline";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { ListingStatus } from "@/lib/types";
 
-const STATUSES: ListingStatus[] = [
-  "new",
-  "interested",
-  "contacted",
-  "rejected",
-];
+const MESSAGE_TEMPLATE_ID = "default";
+
+function revalidateDashboards() {
+  revalidatePath("/");
+  revalidatePath("/pipeline");
+}
+
+async function logListingEvent(
+  listingId: string,
+  kind: string,
+  detail: string | null,
+) {
+  const supabase = getServiceSupabase();
+  const { error } = await supabase
+    .from("listing_events")
+    .insert({ listing_id: listingId, kind, detail });
+  if (error) console.error("Failed to log listing event:", error.message);
+}
 
 export async function updateListingStatus(id: string, status: ListingStatus) {
-  if (!STATUSES.includes(status)) {
+  if (!isListingStatus(status)) {
     throw new Error("Invalid status");
   }
 
   const supabase = getServiceSupabase();
   const { error } = await supabase
     .from("listings")
-    .update({ status })
+    .update({ status, stage_changed_at: new Date().toISOString() })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
-  revalidatePath("/");
+  await logListingEvent(id, "stage", stageLabel(status));
+  revalidateDashboards();
+}
+
+export async function updateListingDetails(
+  id: string,
+  input: { notes: string; viewingAt: string },
+) {
+  const notes = input.notes.trim() || null;
+  const viewingAt = input.viewingAt
+    ? fromBerlinInputValue(input.viewingAt)
+    : null;
+  if (input.viewingAt && !viewingAt) {
+    throw new Error("Invalid viewing date");
+  }
+
+  const supabase = getServiceSupabase();
+  const { error } = await supabase
+    .from("listings")
+    .update({ notes, viewing_at: viewingAt?.toISOString() ?? null })
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+  if (viewingAt) {
+    await logListingEvent(
+      id,
+      "viewing",
+      viewingAt.toLocaleString("de-DE", { timeZone: APP_TIME_ZONE }),
+    );
+  }
+  revalidateDashboards();
+}
+
+export async function saveMessageTemplate(body: string) {
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error("Template can't be empty");
+
+  const supabase = getServiceSupabase();
+  const { error } = await supabase.from("message_templates").upsert({
+    id: MESSAGE_TEMPLATE_ID,
+    body: trimmed,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/pipeline");
 }
 
 export async function createSearchConfig(input: {

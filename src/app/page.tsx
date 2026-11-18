@@ -1,4 +1,5 @@
 import { AddSearchForm } from "@/components/AddSearchForm";
+import { AppNav } from "@/components/AppNav";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ExcludeTermsPanel } from "@/components/ExcludeTermsPanel";
 import { FilterBar, type DashboardFilters } from "@/components/FilterBar";
@@ -60,7 +61,7 @@ export default async function HomePage({
   }
 
   if (filters.status === "open") {
-    query = query.neq("status", "rejected");
+    query = query.neq("status", "lost");
   } else if (filters.status !== "all") {
     query = query.eq("status", filters.status);
   }
@@ -94,6 +95,7 @@ export default async function HomePage({
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-10 px-6 py-10">
+      <AppNav active="inbox" />
       <header className="space-y-2">
         <p className="text-sm font-medium tracking-wide text-accent uppercase">
           Personal tool

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { STAGES } from "@/lib/pipeline";
 
 export type DashboardFilters = {
   status: string;
@@ -24,11 +25,12 @@ export function FilterBar({
           className="rounded-md border border-black/10 bg-white px-3 py-2"
         >
           <option value="all">All</option>
-          <option value="new">New</option>
-          <option value="interested">Interested</option>
-          <option value="contacted">Contacted</option>
-          <option value="rejected">Rejected</option>
-          <option value="open">Open (not rejected)</option>
+          <option value="open">Open (not lost)</option>
+          {STAGES.map((stage) => (
+            <option key={stage.value} value={stage.value}>
+              {stage.label}
+            </option>
+          ))}
         </select>
       </label>
 
