@@ -176,7 +176,11 @@ export function PipelineCard({
                   timeZone: APP_TIME_ZONE,
                 })}{" "}
                 ·{" "}
-                {event.kind === "stage" ? `→ ${event.detail}` : event.detail}
+                {event.kind === "stage"
+                  ? `→ ${event.detail}`
+                  : event.kind === "reply"
+                    ? `💬 ${event.detail}`
+                    : event.detail}
               </li>
             ))}
           </ul>

@@ -113,6 +113,47 @@ export function formatSearchChangeMessage(input: {
   ].join("\n");
 }
 
+export function formatReplyMessage(input: {
+  senderName: string | null;
+  listingTitle: string;
+  listingUrl: string | null;
+  message: string | null;
+  stageNote: string | null;
+  crmUrl: string;
+}): string {
+  const from = input.senderName ? ` from ${escapeHtml(input.senderName)}` : "";
+  const message = input.message
+    ? `<i>${escapeHtml(truncate(input.message, 1500))}</i>`
+    : "<i>(no text — probably photos)</i>";
+  const links = [
+    input.listingUrl ? `<a href="${escapeHtml(input.listingUrl)}">Listing</a>` : null,
+    `<a href="${escapeHtml(input.crmUrl)}">CRM</a>`,
+    `<a href="https://www.kleinanzeigen.de/m-nachrichten.html">Reply on Kleinanzeigen</a>`,
+  ].filter(Boolean);
+
+  return [
+    `💬 <b>Reply${from}</b>`,
+    `<b>${escapeHtml(input.listingTitle)}</b>`,
+    input.stageNote ? escapeHtml(input.stageNote) : null,
+    "",
+    message,
+    "",
+    links.join(" · "),
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+}
+
+export function formatForwardingCodeMessage(code: string | null): string {
+  return code
+    ? `📨 <b>Gmail forwarding confirmation code:</b> <code>${escapeHtml(code)}</code>\nEnter it in Gmail → Settings → Forwarding.`
+    : "📨 Gmail sent a forwarding confirmation email, but no code was found in it. Check Postmark's activity log.";
+}
+
+function truncate(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value;
+}
+
 /**
  * Kleinanzeigen's image CDN sizes photos via a `rule` query param (e.g. $_59 ≈ 960px wide).
  * Swap to the compact $_2 preset (~200px) so Telegram renders a small photo, not a full-width one.
