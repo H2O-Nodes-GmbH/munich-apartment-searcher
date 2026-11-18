@@ -1,8 +1,5 @@
 import { matchExcludeTerms } from "@/lib/exclude";
-import {
-  createNotifierFromEnv,
-  type NotifiableListing,
-} from "@/lib/notifications";
+import type { NotifiableListing } from "@/lib/notifications";
 import { scrapeListingDetails, scrapeSearchUrl } from "@/lib/scraper";
 import type { ParsedListing } from "@/lib/scraper/types";
 import {
@@ -27,11 +24,9 @@ export type PollSummary = {
 
 export async function pollActiveSearches(options?: {
   delayMs?: number;
-  notify?: boolean;
 }): Promise<PollSummary> {
   const supabase = getServiceSupabase();
   const delayMs = options?.delayMs ?? DEFAULT_DELAY_MS;
-  const shouldNotify = options?.notify !== false;
 
   const { data: configs, error: configError } = await supabase
     .from("search_configs")
@@ -58,7 +53,7 @@ export async function pollActiveSearches(options?: {
     errors: [],
   };
 
-  const newlyInsertedForNotify: PendingNotify[] = [];
+  const newlyInserted: PendingNotify[] = [];
   const searchConfigs = (configs ?? []) as SearchConfigRow[];
 
   for (let i = 0; i < searchConfigs.length; i++) {
@@ -91,7 +86,7 @@ export async function pollActiveSearches(options?: {
 
       for (const row of persist.inserted) {
         if (!row.is_excluded) {
-          newlyInsertedForNotify.push({
+          newlyInserted.push({
             id: row.id,
             title: row.title,
             priceText: row.price_text,
@@ -117,16 +112,10 @@ export async function pollActiveSearches(options?: {
     }
   }
 
-  if (newlyInsertedForNotify.length > 0) {
-    const toNotify = await enrichAndFilterSellers(newlyInsertedForNotify);
-    summary.excludedNew += newlyInsertedForNotify.length - toNotify.length;
-    if (shouldNotify && toNotify.length > 0) {
-      const notifier = createNotifierFromEnv();
-      if (notifier) {
-        await notifier.notifyNewListings(toNotify);
-        summary.notified = toNotify.length;
-      }
-    }
+  // Still enrich details / drop brand-new seller accounts — no Telegram for new listings.
+  if (newlyInserted.length > 0) {
+    const kept = await enrichAndFilterSellers(newlyInserted);
+    summary.excludedNew += newlyInserted.length - kept.length;
   }
 
   return summary;
@@ -136,7 +125,7 @@ type PendingNotify = NotifiableListing & { id: string };
 
 /**
  * Pull Verfügbar ab + seller "Aktiv seit" from each listing detail page.
- * Brand-new seller accounts are flagged excluded and dropped from Telegram.
+ * Brand-new seller accounts are flagged excluded (and won't be auto-messaged later).
  */
 async function enrichAndFilterSellers(
   listings: PendingNotify[],

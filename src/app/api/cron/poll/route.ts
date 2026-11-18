@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const summary = await pollActiveSearches({ notify: true });
+    const summary = await pollActiveSearches();
     return NextResponse.json({
       ok: true,
       polledAt: new Date().toISOString(),
