@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   if (confirmation) {
     try {
       await notifier?.notifyMessage(
-        formatForwardingCodeMessage(confirmation.code),
+        formatForwardingCodeMessage(confirmation),
       );
     } catch (err) {
       console.error("Failed to send forwarding code to Telegram:", err);

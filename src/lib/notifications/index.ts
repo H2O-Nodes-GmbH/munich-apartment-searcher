@@ -81,6 +81,14 @@ export function createNotifierFromEnv(): Notifier | null {
   return new TelegramNotifier(botToken, chatIds);
 }
 
+/** Separate chat for the daily horoscope cron — keeps apartment alerts uncluttered. */
+export function createHoroscopeNotifierFromEnv(): Notifier | null {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatIds = parseTelegramChatIds(process.env.TELEGRAM_HOROSCOPE_CHAT_ID);
+  if (!botToken || chatIds.length === 0) return null;
+  return new TelegramNotifier(botToken, chatIds);
+}
+
 export type HoroscopeEntry = {
   name: string;
   signLabel: string;
@@ -144,10 +152,23 @@ export function formatReplyMessage(input: {
     .join("\n");
 }
 
-export function formatForwardingCodeMessage(code: string | null): string {
-  return code
-    ? `📨 <b>Gmail forwarding confirmation code:</b> <code>${escapeHtml(code)}</code>\nEnter it in Gmail → Settings → Forwarding.`
-    : "📨 Gmail sent a forwarding confirmation email, but no code was found in it. Check Postmark's activity log.";
+export function formatForwardingCodeMessage(input: {
+  code: string | null;
+  confirmUrl?: string | null;
+}): string {
+  if (input.confirmUrl) {
+    const lines = [
+      "📨 <b>Gmail forwarding confirmation</b>",
+      `Open this link to verify: <a href="${escapeHtml(input.confirmUrl)}">${escapeHtml(input.confirmUrl)}</a>`,
+    ];
+    if (input.code) {
+      lines.push(`Or enter code <code>${escapeHtml(input.code)}</code> in Gmail → Settings → Forwarding.`);
+    }
+    return lines.join("\n");
+  }
+  return input.code
+    ? `📨 <b>Gmail forwarding confirmation code:</b> <code>${escapeHtml(input.code)}</code>\nEnter it in Gmail → Settings → Forwarding.`
+    : "📨 Gmail sent a forwarding confirmation email, but no code or link was found. Check Postmark's activity log.";
 }
 
 function truncate(value: string, max: number): string {

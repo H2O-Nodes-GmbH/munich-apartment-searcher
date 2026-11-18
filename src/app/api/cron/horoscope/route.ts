@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthorized } from "@/lib/auth";
 import { fetchDailyHoroscope, type HoroscopeSign } from "@/lib/horoscope";
 import {
-  createNotifierFromEnv,
+  createHoroscopeNotifierFromEnv,
   formatHoroscopeMessage,
   type HoroscopeEntry,
 } from "@/lib/notifications";
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const notifier = createNotifierFromEnv();
+    const notifier = createHoroscopeNotifierFromEnv();
     if (notifier) {
       await notifier.notifyMessage(formatHoroscopeMessage(entries));
     }

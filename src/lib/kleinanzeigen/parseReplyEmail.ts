@@ -66,16 +66,25 @@ export function isKleinanzeigenReply(input: {
   );
 }
 
-/** Gmail sends this to a new forwarding address; the code must be entered in Gmail. */
+/**
+ * Gmail sends this to a new forwarding address. Modern Gmail uses a confirm
+ * link (`…/mail/vf-…`); older ones also include a numeric code. Cancel links
+ * use `uf-` and must not be returned.
+ */
 export function parseGmailForwardingConfirmation(input: {
   from: string;
   subject: string;
   text: string;
-}): { code: string | null } | null {
+}): { code: string | null; confirmUrl: string | null } | null {
   if (!/forwarding-noreply@google\.com/i.test(input.from)) return null;
   const code =
     input.subject.match(/#(\d{6,})/)?.[1] ??
     input.text.match(/Confirmation code:\s*(\d{6,})/i)?.[1] ??
     null;
-  return { code };
+  const rawUrl =
+    input.text.match(
+      /https:\/\/(?:mail-settings\.google\.com|mail\.google\.com)\/mail\/vf-\S+/i,
+    )?.[0] ?? null;
+  const confirmUrl = rawUrl?.replace(/[),.;>"'\]]+$/, "") ?? null;
+  return { code, confirmUrl };
 }
