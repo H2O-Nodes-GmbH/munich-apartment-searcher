@@ -1,5 +1,6 @@
-import type { Page } from "playwright-core";
+import type { Locator, Page } from "playwright-core";
 import { closeSenderSession, openSenderSession } from "@/lib/sender/browser";
+import { loadContactProfile } from "@/lib/sender/contactProfile";
 
 export type SendResult =
   | { ok: true; sessionId: string }
@@ -38,78 +39,159 @@ async function dismissCookieBanner(page: Page): Promise<void> {
 
 async function pageLooksLoggedOut(page: Page): Promise<boolean> {
   if (LOGIN_URL_RE.test(page.url())) return true;
-  // Logged-in header usually shows the email / Ausloggen.
   const loggedIn = await page
     .locator("text=/angemeldet als|Ausloggen|Abmelden/i")
     .first()
     .isVisible()
     .catch(() => false);
   if (loggedIn) return false;
-
   const loginOverlay = page.locator(
     "a.j-overlay-login, .login-overlay:not(.is-hidden) a.j-overlay-login",
   );
-  if (await loginOverlay.first().isVisible().catch(() => false)) return true;
-  return false;
+  return loginOverlay.first().isVisible().catch(() => false);
 }
 
 async function pageLooksCaptcha(page: Page): Promise<boolean> {
   const body = ((await page.locator("body").innerText().catch(() => "")) || "").slice(0, 4000);
   if (CAPTCHA_RE.test(body)) return true;
-  if ((await page.locator("iframe[src*='recaptcha'], iframe[src*='hcaptcha']").count()) > 0) {
-    return true;
-  }
-  return false;
+  return (await page.locator("iframe[src*='recaptcha'], iframe[src*='hcaptcha']").count()) > 0;
 }
 
-async function openContactForm(page: Page): Promise<boolean> {
-  const textarea = page.locator("#viewad-contact-message, textarea[name='message']").first();
-  if (await textarea.isVisible().catch(() => false)) return true;
+async function openContactUi(page: Page): Promise<"legacy" | "extended" | null> {
+  // Already open?
+  if (await page.locator("dialog[open] textarea").first().isVisible().catch(() => false)) {
+    return "extended";
+  }
+  if (await page.locator("#viewad-contact-message").first().isVisible().catch(() => false)) {
+    return "legacy";
+  }
 
   const openers = [
+    "#viewad-contact-button",
     "button:has-text('Nachricht schreiben')",
     "a:has-text('Nachricht schreiben')",
     "#viewad-contact-button-login-modal",
     "#viewad-contact-button-login",
-    "button.viewad-contact-submit",
   ];
-
   for (const sel of openers) {
     const btn = page.locator(sel).first();
     if (!(await btn.isVisible().catch(() => false))) continue;
     await btn.click({ timeout: 5_000 }).catch(() => undefined);
-    try {
-      await textarea.waitFor({ state: "visible", timeout: 8_000 });
-      return true;
-    } catch {
-      // try next opener
+    await page.waitForTimeout(1_000);
+
+    if (await page.locator("dialog[open]").count()) {
+      try {
+        await page.locator("dialog[open] textarea").first().waitFor({
+          state: "visible",
+          timeout: 8_000,
+        });
+        return "extended";
+      } catch {
+        // keep trying
+      }
+    }
+
+    if (await page.locator("#viewad-contact-message").first().isVisible().catch(() => false)) {
+      return "legacy";
     }
   }
 
-  // Last resort: unhide the modal form if it's present but CSS-hidden.
-  const forced = await page.evaluate(() => {
-    const form = document.querySelector<HTMLElement>("#viewad-contact-modal-form");
-    const field = document.querySelector<HTMLElement>("#viewad-contact-message");
-    if (!form || !field) return false;
-    form.classList.remove("mfp-hide", "is-hidden");
-    form.style.display = "block";
-    field.style.display = "block";
-    return true;
-  });
-  if (forced) {
-    try {
-      await textarea.waitFor({ state: "visible", timeout: 3_000 });
-      return true;
-    } catch {
-      return false;
-    }
+  return null;
+}
+
+async function selectComboboxOption(
+  root: Locator,
+  labelPart: string,
+  optionText: string,
+): Promise<void> {
+  const combo = root.locator(`button[role='combobox']:has-text('${labelPart}')`).first();
+  await combo.click({ timeout: 5_000 });
+  await root.page().waitForTimeout(400);
+  const option = root
+    .page()
+    .locator(`[role='option']:has-text("${optionText}")`)
+    .first();
+  await option.click({ timeout: 5_000 });
+  await root.page().waitForTimeout(300);
+}
+
+async function fillByLabel(
+  root: Locator,
+  labelText: string,
+  value: string,
+): Promise<void> {
+  const field = root.getByLabel(labelText, { exact: false }).first();
+  if (await field.count()) {
+    await field.fill(value);
+    return;
   }
-  return false;
+  // Fallback: label[for] → input id
+  const inputId = await root
+    .locator(`label:has-text('${labelText}')`)
+    .first()
+    .getAttribute("for")
+    .catch(() => null);
+  if (inputId) {
+    await root.locator(`#${CSS.escape(inputId)}`).fill(value);
+  }
+}
+
+async function fillExtendedForm(page: Page, message: string): Promise<void> {
+  const profile = loadContactProfile();
+  const dialog = page.locator("dialog[open]");
+  const root = (await dialog.count()) ? dialog : page.locator("#viewad-contact-form-container");
+
+  const textarea = root.locator("textarea").first();
+  await textarea.waitFor({ state: "visible", timeout: 8_000 });
+  await textarea.fill(message);
+
+  await selectComboboxOption(root, "Anrede", profile.salutation);
+  await fillByLabel(root, "Vorname", profile.firstName);
+  await fillByLabel(root, "Nachname", profile.lastName);
+
+  // Optional address/phone — leave blank if empty env.
+  if (process.env.KA_CONTACT_STREET?.trim()) {
+    await fillByLabel(root, "Straße", process.env.KA_CONTACT_STREET.trim());
+  }
+  if (process.env.KA_CONTACT_ZIP?.trim()) {
+    await fillByLabel(root, "PLZ", process.env.KA_CONTACT_ZIP.trim());
+  }
+  if (process.env.KA_CONTACT_CITY?.trim()) {
+    await fillByLabel(root, "Ort", process.env.KA_CONTACT_CITY.trim());
+  }
+  if (process.env.KA_CONTACT_PHONE?.trim()) {
+    await fillByLabel(root, "Telefon", process.env.KA_CONTACT_PHONE.trim());
+  }
+
+  await selectComboboxOption(root, "Schufa", profile.schufa);
+  await selectComboboxOption(root, "Arbeitsverhältnis", profile.employment);
+  await selectComboboxOption(root, "Nettoeinkommen", profile.income);
+  await selectComboboxOption(root, "Haushaltstyp", profile.household);
+
+  if (profile.pets) {
+    await fillByLabel(root, "Tiere", profile.pets).catch(() => undefined);
+  }
+}
+
+async function fillLegacyForm(page: Page, message: string): Promise<void> {
+  const textarea = page.locator("#viewad-contact-message, textarea[name='message']").first();
+  await textarea.waitFor({ state: "visible", timeout: 8_000 });
+  await textarea.fill(message);
+}
+
+async function clickSend(page: Page): Promise<boolean> {
+  const submit = page
+    .locator(
+      "dialog[open] button:has-text('Nachricht senden'), button.viewad-contact-submit, button:has-text('Nachricht senden')",
+    )
+    .first();
+  if (!(await submit.isVisible().catch(() => false))) return false;
+  await submit.click();
+  return true;
 }
 
 /**
  * Send one landlord message via Browserbase + Max's persisted Kleinanzeigen session.
- * No Telegram on success — callers only alert on hard failures if they choose to.
  */
 export async function sendListingMessage(input: {
   listingUrl: string;
@@ -123,7 +205,10 @@ export async function sendListingMessage(input: {
     sessionId = session.sessionId;
     const { page } = session;
 
-    await page.goto(input.listingUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.goto(input.listingUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
     await page.waitForTimeout(1_500);
     await dismissCookieBanner(page);
 
@@ -154,23 +239,23 @@ export async function sendListingMessage(input: {
       };
     }
 
-    const opened = await openContactForm(page);
-    const textarea = page.locator("#viewad-contact-message, textarea[name='message']").first();
-    if (!opened || !(await textarea.isVisible().catch(() => false))) {
+    const formKind = await openContactUi(page);
+    if (!formKind) {
       return {
         ok: false,
         sessionId,
         reason: "form_changed",
-        detail: "Contact message field not found",
+        detail: "Could not open contact form",
       };
     }
 
-    await textarea.fill(input.message);
+    if (formKind === "extended") {
+      await fillExtendedForm(page, input.message);
+    } else {
+      await fillLegacyForm(page, input.message);
+    }
 
-    const submit = page
-      .locator("button.viewad-contact-submit, button:has-text('Nachricht senden')")
-      .first();
-    if (!(await submit.isVisible().catch(() => false))) {
+    if (!(await clickSend(page))) {
       return {
         ok: false,
         sessionId,
@@ -179,8 +264,7 @@ export async function sendListingMessage(input: {
       };
     }
 
-    await submit.click();
-    await page.waitForTimeout(2_000);
+    await page.waitForTimeout(2_500);
 
     if (await pageLooksCaptcha(page)) {
       return {
@@ -191,29 +275,40 @@ export async function sendListingMessage(input: {
       };
     }
 
-    const success = page.locator(".j-viewad-contact-success, #contact-message-success-msg");
-    const errorBox = page.locator(".j-viewad-contact-error");
+    const success = page.locator(
+      ".j-viewad-contact-success, #contact-message-success-msg, text=/Nachricht.*gesendet|erfolgreich gesendet|wurde gesendet/i",
+    );
+    const errorBox = page.locator(
+      ".j-viewad-contact-error, [role='alert'], text=/Fehler|nicht gesendet|ungültig/i",
+    );
 
     if (await success.first().isVisible().catch(() => false)) {
       return { ok: true, sessionId };
     }
 
-    const errorVisible = await errorBox.first().isVisible().catch(() => false);
-    if (errorVisible) {
-      const detail = ((await errorBox.first().innerText().catch(() => "")) || "Send failed").trim();
-      return { ok: false, sessionId, reason: "send_failed", detail: detail.slice(0, 500) };
+    // Dialog closed after send is a good signal for the new UI.
+    const dialogStillOpen = (await page.locator("dialog[open]").count()) > 0;
+    if (formKind === "extended" && !dialogStillOpen) {
+      return { ok: true, sessionId };
+    }
+
+    if (await errorBox.first().isVisible().catch(() => false)) {
+      const detail = (
+        (await errorBox.first().innerText().catch(() => "")) || "Send failed"
+      ).trim();
+      return {
+        ok: false,
+        sessionId,
+        reason: "send_failed",
+        detail: detail.slice(0, 500),
+      };
     }
 
     await page.waitForTimeout(2_000);
     if (await success.first().isVisible().catch(() => false)) {
       return { ok: true, sessionId };
     }
-
-    // Some logged-in flows close the modal without a success banner; if the
-    // textarea emptied / disappeared, treat as sent.
-    const stillVisible = await textarea.isVisible().catch(() => false);
-    const value = stillVisible ? await textarea.inputValue().catch(() => input.message) : "";
-    if (!stillVisible || value.trim() === "") {
+    if (formKind === "extended" && (await page.locator("dialog[open]").count()) === 0) {
       return { ok: true, sessionId };
     }
 
