@@ -50,6 +50,17 @@ export async function GET(request: Request) {
 
     if (result.ok) {
       await markListingSent(listing.id);
+      const notifier = createNotifierFromEnv();
+      await notifier?.notifyMessage(
+        [
+          "✅ <b>Message sent</b>",
+          escapeHtml(listing.title),
+          listing.location ? escapeHtml(listing.location) : null,
+          `<a href="${escapeHtml(listing.url)}">Open listing</a>`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
       return NextResponse.json({
         ok: true,
         listingId: listing.id,
