@@ -166,7 +166,7 @@ export function formatSendSummaryMessage(input: {
 }): string {
   const hours = input.windowHours ?? 24;
   const header = `📬 <b>Daily send summary</b> (last ${hours}h)`;
-  const pipeline = `<a href="${escapeHtml(input.pipelineUrl)}">Open Pipeline</a>`;
+  const pipeline = `🗂️ <a href="${escapeHtml(input.pipelineUrl)}">Open Pipeline</a>`;
 
   if (input.listings.length === 0) {
     return [header, "", "No landlord messages sent.", "", pipeline].join("\n");
@@ -178,14 +178,12 @@ export function formatSendSummaryMessage(input: {
     return `${index + 1}. <a href="${escapeHtml(listing.url)}">${escapeHtml(truncate(listing.title, 80))}</a>${loc}\n    <i>${escapeHtml(when)}</i>`;
   });
 
-  let body = [header, "", `<b>${input.listings.length}</b> message${input.listings.length === 1 ? "" : "s"} sent:`, "", ...lines, "", pipeline].join(
-    "\n",
-  );
+  let body = [header, "", ...lines, "", pipeline].join("\n");
 
   // Telegram hard limit is 4096; keep a little headroom.
   if (body.length > 4000) {
     const kept = [];
-    let used = header.length + 80 + pipeline.length;
+    let used = header.length + pipeline.length + 10;
     for (const line of lines) {
       if (used + line.length + 2 > 3800) break;
       kept.push(line);
@@ -195,10 +193,8 @@ export function formatSendSummaryMessage(input: {
     body = [
       header,
       "",
-      `<b>${input.listings.length}</b> messages sent:`,
-      "",
       ...kept,
-      omitted > 0 ? `\n…and ${omitted} more` : null,
+      omitted > 0 ? `…and ${omitted} more` : null,
       "",
       pipeline,
     ]
