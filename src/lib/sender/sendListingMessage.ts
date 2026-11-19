@@ -6,21 +6,50 @@ export type SendResult =
   | {
       ok: false;
       sessionId: string | null;
-      reason: "login_required" | "captcha" | "form_changed" | "send_failed" | "error";
+      reason:
+        | "login_required"
+        | "captcha"
+        | "form_changed"
+        | "listing_unavailable"
+        | "send_failed"
+        | "error";
       detail: string;
     };
 
-const LOGIN_URL_RE = /m-einloggen\.html/i;
+const LOGIN_URL_RE = /m-einloggen\.html|login\.kleinanzeigen\.de/i;
 const CAPTCHA_RE = /captcha|ich bin kein roboter|recaptcha|hcaptcha/i;
+const LISTING_URL_RE = /\/s-anzeige\//i;
+
+async function dismissCookieBanner(page: Page): Promise<void> {
+  for (const sel of [
+    "button:has-text('Alle akzeptieren')",
+    "button:has-text('Akzeptieren und weiter')",
+    "button:has-text('Akzeptieren')",
+    "#gdpr-banner-accept",
+    "[data-testid='gdpr-banner-accept']",
+  ]) {
+    const btn = page.locator(sel).first();
+    if (await btn.isVisible().catch(() => false)) {
+      await btn.click({ timeout: 3_000 }).catch(() => undefined);
+      await page.waitForTimeout(500);
+    }
+  }
+}
 
 async function pageLooksLoggedOut(page: Page): Promise<boolean> {
   if (LOGIN_URL_RE.test(page.url())) return true;
-  const loginCta = page.locator(
-    "#viewad-contact-button-login, #viewad-contact-button-login-modal, a.j-overlay-login",
+  // Logged-in header usually shows the email / Ausloggen.
+  const loggedIn = await page
+    .locator("text=/angemeldet als|Ausloggen|Abmelden/i")
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (loggedIn) return false;
+
+  const loginOverlay = page.locator(
+    "a.j-overlay-login, .login-overlay:not(.is-hidden) a.j-overlay-login",
   );
-  if ((await loginCta.count()) > 0 && (await loginCta.first().isVisible().catch(() => false))) {
-    return true;
-  }
+  if (await loginOverlay.first().isVisible().catch(() => false)) return true;
   return false;
 }
 
@@ -33,24 +62,49 @@ async function pageLooksCaptcha(page: Page): Promise<boolean> {
   return false;
 }
 
-async function openContactForm(page: Page): Promise<void> {
-  const textarea = page.locator("#viewad-contact-message");
-  if (await textarea.isVisible().catch(() => false)) return;
+async function openContactForm(page: Page): Promise<boolean> {
+  const textarea = page.locator("#viewad-contact-message, textarea[name='message']").first();
+  if (await textarea.isVisible().catch(() => false)) return true;
 
   const openers = [
-    "#viewad-contact-button-login-modal",
-    "#viewad-contact-button-login",
     "button:has-text('Nachricht schreiben')",
     "a:has-text('Nachricht schreiben')",
+    "#viewad-contact-button-login-modal",
+    "#viewad-contact-button-login",
+    "button.viewad-contact-submit",
   ];
+
   for (const sel of openers) {
     const btn = page.locator(sel).first();
-    if ((await btn.count()) === 0) continue;
     if (!(await btn.isVisible().catch(() => false))) continue;
     await btn.click({ timeout: 5_000 }).catch(() => undefined);
-    await page.waitForTimeout(800);
-    if (await textarea.isVisible().catch(() => false)) return;
+    try {
+      await textarea.waitFor({ state: "visible", timeout: 8_000 });
+      return true;
+    } catch {
+      // try next opener
+    }
   }
+
+  // Last resort: unhide the modal form if it's present but CSS-hidden.
+  const forced = await page.evaluate(() => {
+    const form = document.querySelector<HTMLElement>("#viewad-contact-modal-form");
+    const field = document.querySelector<HTMLElement>("#viewad-contact-message");
+    if (!form || !field) return false;
+    form.classList.remove("mfp-hide", "is-hidden");
+    form.style.display = "block";
+    field.style.display = "block";
+    return true;
+  });
+  if (forced) {
+    try {
+      await textarea.waitFor({ state: "visible", timeout: 3_000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 /**
@@ -71,6 +125,16 @@ export async function sendListingMessage(input: {
 
     await page.goto(input.listingUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await page.waitForTimeout(1_500);
+    await dismissCookieBanner(page);
+
+    if (!LISTING_URL_RE.test(page.url())) {
+      return {
+        ok: false,
+        sessionId,
+        reason: "listing_unavailable",
+        detail: `Listing page redirected away (${page.url()})`,
+      };
+    }
 
     if (await pageLooksCaptcha(page)) {
       return {
@@ -90,10 +154,9 @@ export async function sendListingMessage(input: {
       };
     }
 
-    await openContactForm(page);
-
-    const textarea = page.locator("#viewad-contact-message");
-    if (!(await textarea.isVisible().catch(() => false))) {
+    const opened = await openContactForm(page);
+    const textarea = page.locator("#viewad-contact-message, textarea[name='message']").first();
+    if (!opened || !(await textarea.isVisible().catch(() => false))) {
       return {
         ok: false,
         sessionId,
@@ -104,7 +167,9 @@ export async function sendListingMessage(input: {
 
     await textarea.fill(input.message);
 
-    const submit = page.locator("button.viewad-contact-submit, button:has-text('Nachricht senden')").first();
+    const submit = page
+      .locator("button.viewad-contact-submit, button:has-text('Nachricht senden')")
+      .first();
     if (!(await submit.isVisible().catch(() => false))) {
       return {
         ok: false,
@@ -133,16 +198,22 @@ export async function sendListingMessage(input: {
       return { ok: true, sessionId };
     }
 
-    // Some flows hide the modal and show a toast; treat missing error + cleared form as ok.
     const errorVisible = await errorBox.first().isVisible().catch(() => false);
     if (errorVisible) {
       const detail = ((await errorBox.first().innerText().catch(() => "")) || "Send failed").trim();
       return { ok: false, sessionId, reason: "send_failed", detail: detail.slice(0, 500) };
     }
 
-    // Fallback: AJAX success often toggles the success block with a short delay.
     await page.waitForTimeout(2_000);
     if (await success.first().isVisible().catch(() => false)) {
+      return { ok: true, sessionId };
+    }
+
+    // Some logged-in flows close the modal without a success banner; if the
+    // textarea emptied / disappeared, treat as sent.
+    const stillVisible = await textarea.isVisible().catch(() => false);
+    const value = stillVisible ? await textarea.inputValue().catch(() => input.message) : "";
+    if (!stillVisible || value.trim() === "") {
       return { ok: true, sessionId };
     }
 

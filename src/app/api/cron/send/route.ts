@@ -7,6 +7,7 @@ import {
   claimNextQueuedListing,
   loadMessageTemplate,
   markListingSendFailed,
+  markListingSendSkipped,
   markListingSent,
 } from "@/lib/sender/queue";
 import { sendListingMessage } from "@/lib/sender/sendListingMessage";
@@ -58,12 +59,19 @@ export async function GET(request: Request) {
       });
     }
 
-    await markListingSendFailed(
-      listing.id,
-      `${result.reason}: ${result.detail}`,
-    );
+    if (result.reason === "listing_unavailable") {
+      await markListingSendSkipped(
+        listing.id,
+        `${result.reason}: ${result.detail}`,
+      );
+    } else {
+      await markListingSendFailed(
+        listing.id,
+        `${result.reason}: ${result.detail}`,
+      );
+    }
 
-    // Only alert on blockers that need human action — not routine empty queue.
+    // Only alert on blockers that need human action.
     if (
       result.reason === "login_required" ||
       result.reason === "captcha" ||

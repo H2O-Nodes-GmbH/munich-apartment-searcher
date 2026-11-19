@@ -124,3 +124,25 @@ export async function markListingSendFailed(
     detail: detail.slice(0, 1000),
   });
 }
+
+export async function markListingSendSkipped(
+  listingId: string,
+  detail: string,
+): Promise<void> {
+  const supabase = getServiceSupabase();
+  const { error } = await supabase
+    .from("listings")
+    .update({
+      send_status: "skipped" satisfies SendStatus,
+      send_error: detail.slice(0, 1000),
+    })
+    .eq("id", listingId);
+
+  if (error) throw new Error(error.message);
+
+  await supabase.from("listing_events").insert({
+    listing_id: listingId,
+    kind: "send_skipped",
+    detail: detail.slice(0, 1000),
+  });
+}
