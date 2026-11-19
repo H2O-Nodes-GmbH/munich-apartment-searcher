@@ -57,27 +57,57 @@ async function pageLooksCaptcha(page: Page): Promise<boolean> {
   return (await page.locator("iframe[src*='recaptcha'], iframe[src*='hcaptcha']").count()) > 0;
 }
 
-async function detectOpenFormKind(
-  page: Page,
-): Promise<"legacy" | "extended" | null> {
+type FormKind = "legacy" | "profile";
+
+async function listingLooksGone(page: Page): Promise<boolean> {
+  const body = ((await page.locator("body").innerText().catch(() => "")) || "").slice(
+    0,
+    2500,
+  );
+  if (/gelöscht|nicht mehr verfügbar|anzeige.*entfernt|reserviert/i.test(body)) {
+    return true;
+  }
+  const contact = page.locator("#viewad-contact-button").first();
+  if (await contact.isVisible().catch(() => false)) {
+    const disabled =
+      (await contact.isDisabled().catch(() => false)) ||
+      (await contact.getAttribute("aria-disabled")) === "true";
+    if (disabled) return true;
+  }
+  return false;
+}
+
+async function detectOpenFormKind(page: Page): Promise<FormKind | null> {
   const dialog = page.locator("dialog[open]");
   if (await dialog.count()) {
-    const combos = await dialog.locator("button[role='combobox']").count();
     const hasTextarea = await dialog
       .locator("textarea")
       .first()
       .isVisible()
       .catch(() => false);
-    if (combos >= 3 && hasTextarea) return "extended";
-    if (hasTextarea) return "legacy";
+    if (!hasTextarea) return null;
+    const combos = await dialog.locator("button[role='combobox']").count();
+    const hasName = await dialog
+      .getByLabel(/Vorname/i)
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (combos > 0 || hasName) return "profile";
+    return "legacy";
   }
-  if (await page.locator("#viewad-contact-message").first().isVisible().catch(() => false)) {
+  if (
+    await page
+      .locator("#viewad-contact-message")
+      .first()
+      .isVisible()
+      .catch(() => false)
+  ) {
     return "legacy";
   }
   return null;
 }
 
-async function openContactUi(page: Page): Promise<"legacy" | "extended" | null> {
+async function openContactUi(page: Page): Promise<FormKind | null> {
   const already = await detectOpenFormKind(page);
   if (already) return already;
 
@@ -91,14 +121,21 @@ async function openContactUi(page: Page): Promise<"legacy" | "extended" | null> 
   for (const sel of openers) {
     const btn = page.locator(sel).first();
     if (!(await btn.isVisible().catch(() => false))) continue;
+    const disabled =
+      (await btn.isDisabled().catch(() => false)) ||
+      (await btn.getAttribute("aria-disabled")) === "true";
+    if (disabled) continue;
     await btn.click({ timeout: 5_000 }).catch(() => undefined);
     await page.waitForTimeout(1_000);
 
     try {
-      await page.locator("dialog[open] textarea, #viewad-contact-message").first().waitFor({
-        state: "visible",
-        timeout: 8_000,
-      });
+      await page
+        .locator("dialog[open] textarea, #viewad-contact-message")
+        .first()
+        .waitFor({
+          state: "visible",
+          timeout: 8_000,
+        });
     } catch {
       continue;
     }
@@ -180,36 +217,56 @@ async function fillByLabel(
   }
 }
 
-async function fillExtendedForm(page: Page, message: string): Promise<void> {
+/**
+ * Profile dialog variants:
+ * - short: Anrede + Schufa (+ name/address)
+ * - full: Anrede + Schufa + employment + income + household
+ */
+async function fillProfileForm(page: Page, message: string): Promise<void> {
   const profile = loadContactProfile();
   const dialog = page.locator("dialog[open]");
   const root = (await dialog.count())
     ? dialog
     : page.locator("#viewad-contact-form-container");
 
-  // Fill selects first (top of dialog) so listboxes aren't scrolled off-screen.
-  // Combobox order: 0 Anrede, 1 Schufa, 2 Arbeitsverhältnis, 3 Nettoeinkommen, 4 Haushaltstyp
-  await selectComboboxByIndex(page, root, 0, profile.salutation);
+  const comboCount = await root.locator("button[role='combobox']").count();
+  // Index 0 is always Anrede when present.
+  if (comboCount >= 1) {
+    await selectComboboxByIndex(page, root, 0, profile.salutation);
+  }
+
   await fillByLabel(root, "Vorname", profile.firstName);
   await fillByLabel(root, "Nachname", profile.lastName);
 
-  if (process.env.KA_CONTACT_STREET?.trim()) {
-    await fillByLabel(root, "Straße", process.env.KA_CONTACT_STREET.trim());
-  }
-  if (process.env.KA_CONTACT_ZIP?.trim()) {
-    await fillByLabel(root, "PLZ", process.env.KA_CONTACT_ZIP.trim());
-  }
-  if (process.env.KA_CONTACT_CITY?.trim()) {
-    await fillByLabel(root, "Ort", process.env.KA_CONTACT_CITY.trim());
-  }
-  if (process.env.KA_CONTACT_PHONE?.trim()) {
-    await fillByLabel(root, "Telefon", process.env.KA_CONTACT_PHONE.trim());
-  }
+  const street = process.env.KA_CONTACT_STREET?.trim();
+  const zip = process.env.KA_CONTACT_ZIP?.trim();
+  const city = process.env.KA_CONTACT_CITY?.trim();
+  const phone = process.env.KA_CONTACT_PHONE?.trim();
+  if (street) await fillByLabel(root, "Straße", street);
+  if (zip) await fillByLabel(root, "PLZ", zip);
+  if (city) await fillByLabel(root, "Ort", city);
+  if (phone) await fillByLabel(root, "Telefon", phone);
 
-  await selectComboboxByIndex(page, root, 1, profile.schufa);
-  await selectComboboxByIndex(page, root, 2, profile.employment);
-  await selectComboboxByIndex(page, root, 3, profile.income);
-  await selectComboboxByIndex(page, root, 4, profile.household);
+  if (comboCount === 2) {
+    // Short professional form: Anrede + Schufa only.
+    await selectComboboxByIndex(page, root, 1, profile.schufa);
+  } else if (comboCount >= 5) {
+    await selectComboboxByIndex(page, root, 1, profile.schufa);
+    await selectComboboxByIndex(page, root, 2, profile.employment);
+    await selectComboboxByIndex(page, root, 3, profile.income);
+    await selectComboboxByIndex(page, root, 4, profile.household);
+  } else if (comboCount > 2) {
+    // Unusual mid-size form: fill Schufa if second combo looks like it, then best-effort.
+    await selectComboboxByIndex(page, root, 1, profile.schufa).catch(() => undefined);
+    if (comboCount >= 3) {
+      await selectComboboxByIndex(page, root, 2, profile.employment).catch(
+        () => undefined,
+      );
+    }
+    if (comboCount >= 4) {
+      await selectComboboxByIndex(page, root, 3, profile.income).catch(() => undefined);
+    }
+  }
 
   if (profile.pets) {
     await fillByLabel(root, "Tiere", profile.pets).catch(() => undefined);
@@ -277,6 +334,15 @@ export async function sendListingMessage(input: {
       };
     }
 
+    if (await listingLooksGone(page)) {
+      return {
+        ok: false,
+        sessionId,
+        reason: "listing_unavailable",
+        detail: "Listing deleted, reserved, or contact disabled",
+      };
+    }
+
     if (await pageLooksCaptcha(page)) {
       return {
         ok: false,
@@ -305,8 +371,8 @@ export async function sendListingMessage(input: {
       };
     }
 
-    if (formKind === "extended") {
-      await fillExtendedForm(page, input.message);
+    if (formKind === "profile") {
+      await fillProfileForm(page, input.message);
     } else {
       await fillLegacyForm(page, input.message);
     }
@@ -331,22 +397,41 @@ export async function sendListingMessage(input: {
       };
     }
 
-    const success = page.locator(
-      ".j-viewad-contact-success, #contact-message-success-msg, text=/Erfolgreich gesendet|Nachricht.*gesendet|wurde gesendet/i",
-    );
-    const validationError = page.locator(
-      "dialog[open] >> text=/Validierungsfehler|Bitte wähle eine Option|Bitte fülle/i",
-    );
+    const dialogText = async () =>
+      ((await page.locator("dialog[open]").innerText().catch(() => "")) || "").trim();
 
-    if (await success.first().isVisible().catch(() => false)) {
+    const looksSuccessful = async () => {
+      if (
+        await page
+          .getByText(/Erfolgreich gesendet/i)
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
+        return true;
+      }
+      if (
+        await page
+          .locator(".j-viewad-contact-success, #contact-message-success-msg")
+          .first()
+          .isVisible()
+          .catch(() => false)
+      ) {
+        return true;
+      }
+      const text = await dialogText();
+      return /Erfolgreich gesendet|Nachricht.*gesendet|wurde gesendet/i.test(text);
+    };
+
+    if (await looksSuccessful()) {
       return { ok: true, sessionId };
     }
 
+    const validationError = page.locator(
+      "dialog[open] >> text=/Validierungsfehler|Bitte wähle eine Option|Bitte fülle/i",
+    );
     if (await validationError.first().isVisible().catch(() => false)) {
-      const detail = (
-        (await page.locator("dialog[open]").innerText().catch(() => "")) ||
-        "Validation failed"
-      )
+      const detail = (await dialogText())
         .split("\n")
         .find((line) => /Validierungsfehler|Bitte wähle|Bitte fülle/i.test(line))
         ?.trim();
@@ -359,16 +444,15 @@ export async function sendListingMessage(input: {
     }
 
     // Dialog closed after send is a good signal for the new UI.
-    const dialogStillOpen = (await page.locator("dialog[open]").count()) > 0;
-    if (formKind === "extended" && !dialogStillOpen) {
+    if (formKind === "profile" && (await page.locator("dialog[open]").count()) === 0) {
       return { ok: true, sessionId };
     }
 
     await page.waitForTimeout(2_000);
-    if (await success.first().isVisible().catch(() => false)) {
+    if (await looksSuccessful()) {
       return { ok: true, sessionId };
     }
-    if (formKind === "extended" && (await page.locator("dialog[open]").count()) === 0) {
+    if (formKind === "profile" && (await page.locator("dialog[open]").count()) === 0) {
       return { ok: true, sessionId };
     }
 
@@ -376,7 +460,9 @@ export async function sendListingMessage(input: {
       ok: false,
       sessionId,
       reason: "send_failed",
-      detail: "No success confirmation after submit",
+      detail: `No success confirmation after submit${
+        (await dialogText()) ? `: ${(await dialogText()).slice(0, 180)}` : ""
+      }`,
     };
   } catch (error) {
     return {
