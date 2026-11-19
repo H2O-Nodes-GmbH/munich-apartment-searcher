@@ -16,8 +16,7 @@ type HookRule = {
   sentence: (listing: HookListing, haystack: string) => string;
 };
 
-const FALLBACK =
-  "Der Zuschnitt und die Lage wirken sehr gut für uns - die Anzeige hat uns direkt angesprochen.";
+const FALLBACK = "Der Zuschnitt und die Lage wirken sehr gut für uns.";
 
 function districtFromLocation(location: string | null | undefined): string | null {
   if (!location?.trim()) return null;
@@ -41,7 +40,7 @@ const RULES: HookRule[] = [
         h,
       ),
     sentence: () =>
-      "Besonders gut passt uns der Stellplatz - wir haben ein Auto und freuen uns über eine unkomplizierte Parklösung.",
+      "Besonders gut passt uns der Stellplatz, da wir ein Auto haben.",
   },
   {
     id: "balkon",
@@ -52,28 +51,26 @@ const RULES: HookRule[] = [
         : /\bloggia/i.test(h)
           ? "die Loggia"
           : "der Balkon";
-      return `Uns hat besonders ${outdoor} angesprochen - ein Stück Draußen im Alltag wäre für uns ideal.`;
+      return `Uns hat besonders ${outdoor} angesprochen.`;
     },
   },
   {
     id: "ebk",
     test: (h) => /\beinbauküche|\bebk\b|\bküche\s+(ist\s+)?vorhanden/i.test(h),
-    sentence: () =>
-      "Die Einbauküche ist für uns ein echtes Plus - so könnten wir zügig und unkompliziert einziehen.",
+    sentence: () => "Die Einbauküche ist für uns ein echtes Plus.";
   },
   {
     id: "size",
     test: (h) => sizeFromText(h) !== null,
     sentence: (_l, h) => {
       const size = sizeFromText(h);
-      return `Die ca. ${size} m² wirken genau richtig für uns beide - weder zu eng noch zu groß.`;
+      return `Die ca. ${size} m² wirken genau richtig für uns beide.`;
     },
   },
   {
     id: "quiet",
     test: (h) => /\bruhig|\bruhelage|\bruhige\s+lage|\babseits/i.test(h),
-    sentence: () =>
-      "Die ruhige Lage spricht uns sehr an - nach der Arbeit würden wir uns über einen ruhigen Rückzugsort freuen.",
+    sentence: () => "Die ruhige Lage spricht uns sehr an.";
   },
   {
     id: "central",
@@ -81,27 +78,24 @@ const RULES: HookRule[] = [
       /\bzentral|\bbestlage|\binnenstadtnah|\bgute\s+anbindung|\bnahverkehr|\bu-bahn|\bs-bahn/i.test(
         h,
       ),
-    sentence: () =>
-      "Die zentrale / gut angebundene Lage passt sehr gut zu unserem Alltag in München.",
+    sentence: () => "Die gute Anbindung passt sehr gut zu unserem Alltag.",
   },
   {
     id: "bright",
     test: (h) => /\bhell|\bsonnig|\blichtdurchflutet|\bsüd/i.test(h),
-    sentence: () =>
-      "Dass die Wohnung hell wirkt, hat uns besonders angesprochen - Licht macht für uns im Alltag einen großen Unterschied.",
+    sentence: () => "Dass die Wohnung hell wirkt, hat uns besonders angesprochen.";
   },
   {
     id: "altbau",
     test: (h) => /\baltbau|\bstuck|\bhohe\s+decken/i.test(h),
-    sentence: () =>
-      "Der Altbau-Charakter der Wohnung spricht uns sehr an - Charme und Charakter sind uns wichtig.",
+    sentence: () => "Der Altbau-Charakter der Wohnung spricht uns sehr an.";
   },
   {
     id: "district",
     test: (_h, listing) => districtFromLocation(listing.location) !== null,
     sentence: (listing) => {
       const district = districtFromLocation(listing.location);
-      return `Vor allem die Lage in ${district} hat uns angesprochen - genau die Gegend, in der wir uns wohlfühlen würden.`;
+      return `Vor allem die Lage in ${district} hat uns angesprochen.`;
     },
   },
 ];
