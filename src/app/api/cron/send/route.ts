@@ -48,6 +48,12 @@ export async function GET(request: Request) {
       message,
     });
 
+    const pipelineUrl = appPipelineUrl(request);
+    const linkLine = [
+      `<a href="${escapeHtml(listing.url)}">Listing</a>`,
+      `<a href="${escapeHtml(pipelineUrl)}">Pipeline</a>`,
+    ].join(" · ");
+
     if (result.ok) {
       await markListingSent(listing.id);
       const notifier = createNotifierFromEnv();
@@ -56,9 +62,10 @@ export async function GET(request: Request) {
           "✅ <b>Message sent</b>",
           escapeHtml(listing.title),
           listing.location ? escapeHtml(listing.location) : null,
-          `<a href="${escapeHtml(listing.url)}">Open listing</a>`,
+          "",
+          linkLine,
         ]
-          .filter(Boolean)
+          .filter((line) => line !== null)
           .join("\n"),
       );
       return NextResponse.json({
@@ -97,8 +104,10 @@ export async function GET(request: Request) {
           result.sessionId
             ? `Session: <code>${escapeHtml(result.sessionId)}</code>`
             : null,
+          "",
+          linkLine,
         ]
-          .filter(Boolean)
+          .filter((line) => line !== null)
           .join("\n"),
       );
     }
@@ -123,4 +132,19 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** Stable Pipeline URL for Telegram — prefer production host over ephemeral cron URL. */
+function appPipelineUrl(request: Request): string {
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.APP_URL?.trim() ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : null);
+  if (configured) {
+    return new URL("/pipeline", configured.endsWith("/") ? configured : `${configured}/`)
+      .toString();
+  }
+  return new URL("/pipeline", request.url).toString();
 }
