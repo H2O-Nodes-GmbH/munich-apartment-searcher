@@ -99,20 +99,19 @@ async function openContactUi(page: Page): Promise<"legacy" | "extended" | null> 
   return null;
 }
 
-async function selectComboboxOption(
+async function selectComboboxByIndex(
+  page: Page,
   root: Locator,
-  labelPart: string,
+  index: number,
   optionText: string,
 ): Promise<void> {
-  const combo = root.locator(`button[role='combobox']:has-text('${labelPart}')`).first();
-  await combo.click({ timeout: 5_000 });
-  await root.page().waitForTimeout(400);
-  const option = root
-    .page()
-    .locator(`[role='option']:has-text("${optionText}")`)
-    .first();
-  await option.click({ timeout: 5_000 });
-  await root.page().waitForTimeout(300);
+  const combo = root.locator("button[role='combobox']").nth(index);
+  await combo.scrollIntoViewIfNeeded().catch(() => undefined);
+  await combo.click({ timeout: 8_000, force: true });
+  await page.waitForTimeout(400);
+  const option = page.locator(`[role='option']`).filter({ hasText: optionText }).first();
+  await option.click({ timeout: 8_000, force: true });
+  await page.waitForTimeout(350);
 }
 
 async function fillByLabel(
@@ -125,7 +124,6 @@ async function fillByLabel(
     await field.fill(value);
     return;
   }
-  // Fallback: label[for] → input id
   const inputId = await root
     .locator(`label:has-text('${labelText}')`)
     .first()
@@ -139,17 +137,20 @@ async function fillByLabel(
 async function fillExtendedForm(page: Page, message: string): Promise<void> {
   const profile = loadContactProfile();
   const dialog = page.locator("dialog[open]");
-  const root = (await dialog.count()) ? dialog : page.locator("#viewad-contact-form-container");
+  const root = (await dialog.count())
+    ? dialog
+    : page.locator("#viewad-contact-form-container");
 
   const textarea = root.locator("textarea").first();
   await textarea.waitFor({ state: "visible", timeout: 8_000 });
   await textarea.fill(message);
 
-  await selectComboboxOption(root, "Anrede", profile.salutation);
+  // Combobox order in the extended rental form:
+  // 0 Anrede, 1 Schufa, 2 Arbeitsverhältnis, 3 Nettoeinkommen, 4 Haushaltstyp
+  await selectComboboxByIndex(page, root, 0, profile.salutation);
   await fillByLabel(root, "Vorname", profile.firstName);
   await fillByLabel(root, "Nachname", profile.lastName);
 
-  // Optional address/phone — leave blank if empty env.
   if (process.env.KA_CONTACT_STREET?.trim()) {
     await fillByLabel(root, "Straße", process.env.KA_CONTACT_STREET.trim());
   }
@@ -163,10 +164,10 @@ async function fillExtendedForm(page: Page, message: string): Promise<void> {
     await fillByLabel(root, "Telefon", process.env.KA_CONTACT_PHONE.trim());
   }
 
-  await selectComboboxOption(root, "Schufa", profile.schufa);
-  await selectComboboxOption(root, "Arbeitsverhältnis", profile.employment);
-  await selectComboboxOption(root, "Nettoeinkommen", profile.income);
-  await selectComboboxOption(root, "Haushaltstyp", profile.household);
+  await selectComboboxByIndex(page, root, 1, profile.schufa);
+  await selectComboboxByIndex(page, root, 2, profile.employment);
+  await selectComboboxByIndex(page, root, 3, profile.income);
+  await selectComboboxByIndex(page, root, 4, profile.household);
 
   if (profile.pets) {
     await fillByLabel(root, "Tiere", profile.pets).catch(() => undefined);
@@ -181,12 +182,14 @@ async function fillLegacyForm(page: Page, message: string): Promise<void> {
 
 async function clickSend(page: Page): Promise<boolean> {
   const submit = page
-    .locator(
-      "dialog[open] button:has-text('Nachricht senden'), button.viewad-contact-submit, button:has-text('Nachricht senden')",
-    )
+    .locator("dialog[open]")
+    .locator("button:has-text('Nachricht senden')")
     .first();
-  if (!(await submit.isVisible().catch(() => false))) return false;
-  await submit.click();
+  const legacy = page.locator("button.viewad-contact-submit").first();
+  const btn = (await submit.isVisible().catch(() => false)) ? submit : legacy;
+  if (!(await btn.isVisible().catch(() => false))) return false;
+  await btn.scrollIntoViewIfNeeded().catch(() => undefined);
+  await btn.click({ timeout: 10_000, force: true });
   return true;
 }
 
