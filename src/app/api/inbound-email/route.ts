@@ -65,15 +65,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, kind: "gmail-forwarding-confirmation" });
   }
 
-  if (!isKleinanzeigenReply({ from, subject })) {
+  if (!isKleinanzeigenReply({ from, subject, text })) {
+    console.info("Inbound ignored", { from, subject: subject.slice(0, 160) });
     return NextResponse.json({ ok: true, kind: "ignored" });
   }
 
   const reply = parseReplyEmail({ subject, text });
   if (!reply.adId) {
-    console.warn("Inbound reply without ad number:", subject);
+    console.warn("Inbound reply without ad number:", { from, subject });
     return NextResponse.json({ ok: true, kind: "unparsed" });
   }
+
+  console.info("Inbound KA reply", {
+    adId: reply.adId,
+    senderName: reply.senderName,
+    subject: subject.slice(0, 160),
+  });
 
   const supabase = getServiceSupabase();
   const { data: listing, error } = await supabase
@@ -87,6 +94,7 @@ export async function POST(request: Request) {
   }
   if (!listing) {
     // Replies about ads that aren't apartments we track (e.g. things Max sells).
+    console.warn("Inbound unmatched ad", { adId: reply.adId, subject });
     return NextResponse.json({ ok: true, kind: "unmatched", adId: reply.adId });
   }
 

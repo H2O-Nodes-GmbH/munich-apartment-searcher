@@ -47,11 +47,21 @@ export function parseReplyEmail(input: {
   const adTitle =
     input.subject.match(/Anzeige\s+["„“](.+?)["“”]\s*$/)?.[1]?.trim() ?? null;
 
-  const replyMatch = text.match(
-    /Antwort von[ \t]+([^\n]+)\n([\s\S]*?)Um auf diese Nachricht zu antworten/,
-  );
+  const replyMatch =
+    text.match(
+      /Antwort von[ \t]+([^\n]+)\n([\s\S]*?)(?:Um auf diese Nachricht zu antworten|Beantworte diese Nachricht)/i,
+    ) ??
+    text.match(/Antwort von[ \t]+([^\n]+)\n([\s\S]+)/i);
   const senderName = replyMatch?.[1]?.trim() || null;
-  const message = replyMatch?.[2]?.trim() || null;
+  let message = replyMatch?.[2]?.trim() || null;
+  if (message) {
+    // Trim common KA / Gmail footer noise.
+    message = message
+      .split(
+        /\n(?:Um auf diese Nachricht|Beantworte diese Nachricht|Diese E-Mail wurde weitergeleitet|---------- Forwarded message)/i,
+      )[0]
+      ?.trim() || null;
+  }
 
   return { adId, adTitle, senderName, message };
 }
@@ -59,10 +69,22 @@ export function parseReplyEmail(input: {
 export function isKleinanzeigenReply(input: {
   from: string;
   subject: string;
+  text?: string;
 }): boolean {
+  const subjectLooksLikeReply =
+    /Antwort zur Anzeige|Nachricht zu|Anfrage zu|Nutzer-Anfrage/i.test(
+      input.subject,
+    );
+  if (!subjectLooksLikeReply) return false;
+
+  // Direct KA mail, or Gmail/Postmark forward where From was rewritten.
+  if (/@mail\.kleinanzeigen\.de/i.test(input.from)) return true;
+  if (/kleinanzeigen\.de/i.test(input.from)) return true;
+  const text = input.text ?? "";
   return (
-    /@mail\.kleinanzeigen\.de/i.test(input.from) &&
-    /Antwort zur Anzeige|Nachricht zu|Anfrage zu/i.test(input.subject)
+    /Anzeigennummer:\s*\d{6,}/i.test(text) ||
+    /@mail\.kleinanzeigen\.de/i.test(text) ||
+    /Antwort von\b/i.test(text)
   );
 }
 
