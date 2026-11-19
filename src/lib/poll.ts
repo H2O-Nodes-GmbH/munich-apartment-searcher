@@ -98,6 +98,7 @@ export async function pollActiveSearches(options?: {
             postedText: row.posted_text,
             availableFrom: null,
             thumbnailUrl: row.thumbnail_url,
+            descriptionSnippet: row.description_snippet,
           });
         }
       }
@@ -134,7 +135,10 @@ export async function pollActiveSearches(options?: {
   return summary;
 }
 
-type PendingNotify = NotifiableListing & { id: string };
+type PendingNotify = NotifiableListing & {
+  id: string;
+  descriptionSnippet?: string | null;
+};
 
 /**
  * Pull Verfügbar ab + seller "Aktiv seit" from each listing detail page.
