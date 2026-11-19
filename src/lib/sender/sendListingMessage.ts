@@ -108,10 +108,45 @@ async function selectComboboxByIndex(
   const combo = root.locator("button[role='combobox']").nth(index);
   await combo.scrollIntoViewIfNeeded().catch(() => undefined);
   await combo.click({ timeout: 8_000, force: true });
+  await page.waitForTimeout(500);
+
+  const options = page.getByRole("option");
+  await options.first().waitFor({ state: "visible", timeout: 8_000 });
+  const labels = (await options.allTextContents()).map((t) => t.trim());
+  const optionIndex = labels.findIndex((t) => t === optionText);
+  if (optionIndex < 0) {
+    throw new Error(
+      `Combobox #${index} missing option "${optionText}" (have: ${labels.join(", ")})`,
+    );
+  }
+
+  // Keyboard selection is reliable for this React listbox; Playwright/DOM clicks often don't stick.
+  for (let i = 0; i < optionIndex; i++) {
+    await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(80);
+  }
+  await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
-  const option = page.locator(`[role='option']`).filter({ hasText: optionText }).first();
-  await option.click({ timeout: 8_000, force: true });
-  await page.waitForTimeout(350);
+
+  const selected = ((await combo.innerText().catch(() => "")) || "").replace(/\s+/g, " ");
+  if (!selected.includes(optionText)) {
+    // Fallback: real mouse click on the option's box.
+    await combo.click({ timeout: 8_000, force: true });
+    await page.waitForTimeout(400);
+    const option = page.getByRole("option", { name: optionText, exact: true });
+    const box = await option.boundingBox();
+    if (box) {
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(400);
+    }
+  }
+
+  const finalSelected = ((await combo.innerText().catch(() => "")) || "").replace(/\s+/g, " ");
+  if (!finalSelected.includes(optionText)) {
+    throw new Error(
+      `Combobox #${index} did not stick on "${optionText}" (now: ${finalSelected.trim()})`,
+    );
+  }
 }
 
 async function fillByLabel(
@@ -141,12 +176,8 @@ async function fillExtendedForm(page: Page, message: string): Promise<void> {
     ? dialog
     : page.locator("#viewad-contact-form-container");
 
-  const textarea = root.locator("textarea").first();
-  await textarea.waitFor({ state: "visible", timeout: 8_000 });
-  await textarea.fill(message);
-
-  // Combobox order in the extended rental form:
-  // 0 Anrede, 1 Schufa, 2 Arbeitsverhältnis, 3 Nettoeinkommen, 4 Haushaltstyp
+  // Fill selects first (top of dialog) so listboxes aren't scrolled off-screen.
+  // Combobox order: 0 Anrede, 1 Schufa, 2 Arbeitsverhältnis, 3 Nettoeinkommen, 4 Haushaltstyp
   await selectComboboxByIndex(page, root, 0, profile.salutation);
   await fillByLabel(root, "Vorname", profile.firstName);
   await fillByLabel(root, "Nachname", profile.lastName);
@@ -172,6 +203,10 @@ async function fillExtendedForm(page: Page, message: string): Promise<void> {
   if (profile.pets) {
     await fillByLabel(root, "Tiere", profile.pets).catch(() => undefined);
   }
+
+  const textarea = root.locator("textarea").first();
+  await textarea.waitFor({ state: "visible", timeout: 8_000 });
+  await textarea.fill(message);
 }
 
 async function fillLegacyForm(page: Page, message: string): Promise<void> {
@@ -189,7 +224,12 @@ async function clickSend(page: Page): Promise<boolean> {
   const btn = (await submit.isVisible().catch(() => false)) ? submit : legacy;
   if (!(await btn.isVisible().catch(() => false))) return false;
   await btn.scrollIntoViewIfNeeded().catch(() => undefined);
-  await btn.click({ timeout: 10_000, force: true });
+  // Prefer a real click — force-click often misses the React handler on this dialog.
+  try {
+    await btn.click({ timeout: 8_000 });
+  } catch {
+    await btn.click({ timeout: 8_000, force: true });
+  }
   return true;
 }
 
@@ -279,32 +319,36 @@ export async function sendListingMessage(input: {
     }
 
     const success = page.locator(
-      ".j-viewad-contact-success, #contact-message-success-msg, text=/Nachricht.*gesendet|erfolgreich gesendet|wurde gesendet/i",
+      ".j-viewad-contact-success, #contact-message-success-msg, text=/Erfolgreich gesendet|Nachricht.*gesendet|wurde gesendet/i",
     );
-    const errorBox = page.locator(
-      ".j-viewad-contact-error, [role='alert'], text=/Fehler|nicht gesendet|ungültig/i",
+    const validationError = page.locator(
+      "dialog[open] >> text=/Validierungsfehler|Bitte wähle eine Option|Bitte fülle/i",
     );
 
     if (await success.first().isVisible().catch(() => false)) {
       return { ok: true, sessionId };
     }
 
-    // Dialog closed after send is a good signal for the new UI.
-    const dialogStillOpen = (await page.locator("dialog[open]").count()) > 0;
-    if (formKind === "extended" && !dialogStillOpen) {
-      return { ok: true, sessionId };
-    }
-
-    if (await errorBox.first().isVisible().catch(() => false)) {
+    if (await validationError.first().isVisible().catch(() => false)) {
       const detail = (
-        (await errorBox.first().innerText().catch(() => "")) || "Send failed"
-      ).trim();
+        (await page.locator("dialog[open]").innerText().catch(() => "")) ||
+        "Validation failed"
+      )
+        .split("\n")
+        .find((line) => /Validierungsfehler|Bitte wähle|Bitte fülle/i.test(line))
+        ?.trim();
       return {
         ok: false,
         sessionId,
         reason: "send_failed",
-        detail: detail.slice(0, 500),
+        detail: (detail || "Form validation failed").slice(0, 500),
       };
+    }
+
+    // Dialog closed after send is a good signal for the new UI.
+    const dialogStillOpen = (await page.locator("dialog[open]").count()) > 0;
+    if (formKind === "extended" && !dialogStillOpen) {
+      return { ok: true, sessionId };
     }
 
     await page.waitForTimeout(2_000);
