@@ -57,14 +57,29 @@ async function pageLooksCaptcha(page: Page): Promise<boolean> {
   return (await page.locator("iframe[src*='recaptcha'], iframe[src*='hcaptcha']").count()) > 0;
 }
 
-async function openContactUi(page: Page): Promise<"legacy" | "extended" | null> {
-  // Already open?
-  if (await page.locator("dialog[open] textarea").first().isVisible().catch(() => false)) {
-    return "extended";
+async function detectOpenFormKind(
+  page: Page,
+): Promise<"legacy" | "extended" | null> {
+  const dialog = page.locator("dialog[open]");
+  if (await dialog.count()) {
+    const combos = await dialog.locator("button[role='combobox']").count();
+    const hasTextarea = await dialog
+      .locator("textarea")
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (combos >= 3 && hasTextarea) return "extended";
+    if (hasTextarea) return "legacy";
   }
   if (await page.locator("#viewad-contact-message").first().isVisible().catch(() => false)) {
     return "legacy";
   }
+  return null;
+}
+
+async function openContactUi(page: Page): Promise<"legacy" | "extended" | null> {
+  const already = await detectOpenFormKind(page);
+  if (already) return already;
 
   const openers = [
     "#viewad-contact-button",
@@ -79,21 +94,17 @@ async function openContactUi(page: Page): Promise<"legacy" | "extended" | null> 
     await btn.click({ timeout: 5_000 }).catch(() => undefined);
     await page.waitForTimeout(1_000);
 
-    if (await page.locator("dialog[open]").count()) {
-      try {
-        await page.locator("dialog[open] textarea").first().waitFor({
-          state: "visible",
-          timeout: 8_000,
-        });
-        return "extended";
-      } catch {
-        // keep trying
-      }
+    try {
+      await page.locator("dialog[open] textarea, #viewad-contact-message").first().waitFor({
+        state: "visible",
+        timeout: 8_000,
+      });
+    } catch {
+      continue;
     }
 
-    if (await page.locator("#viewad-contact-message").first().isVisible().catch(() => false)) {
-      return "legacy";
-    }
+    const kind = await detectOpenFormKind(page);
+    if (kind) return kind;
   }
 
   return null;
@@ -210,7 +221,9 @@ async function fillExtendedForm(page: Page, message: string): Promise<void> {
 }
 
 async function fillLegacyForm(page: Page, message: string): Promise<void> {
-  const textarea = page.locator("#viewad-contact-message, textarea[name='message']").first();
+  const textarea = page
+    .locator("dialog[open] textarea, #viewad-contact-message, textarea[name='message']")
+    .first();
   await textarea.waitFor({ state: "visible", timeout: 8_000 });
   await textarea.fill(message);
 }
