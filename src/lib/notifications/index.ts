@@ -174,8 +174,7 @@ export function formatSendSummaryMessage(input: {
 
   const lines = input.listings.map((listing, index) => {
     const loc = listing.location ? ` · ${escapeHtml(listing.location)}` : "";
-    const when = formatBerlinTime(listing.sentAt);
-    return `${index + 1}. <a href="${escapeHtml(listing.url)}">${escapeHtml(truncate(listing.title, 80))}</a>${loc}\n    <i>${escapeHtml(when)}</i>`;
+    return `${index + 1}. <a href="${escapeHtml(listing.url)}">${escapeHtml(truncate(listing.title, 80))}</a>${loc}`;
   });
 
   let body = [header, "", ...lines, "", pipeline].join("\n");
@@ -203,20 +202,6 @@ export function formatSendSummaryMessage(input: {
   }
 
   return body;
-}
-
-function formatBerlinTime(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat("de-DE", {
-      timeZone: "Europe/Berlin",
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
 }
 
 export function formatForwardingCodeMessage(input: {
