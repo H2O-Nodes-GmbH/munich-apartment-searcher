@@ -23,7 +23,7 @@ export function loadContactProfile(): ContactProfile {
       process.env.KA_CONTACT_SCHUFA?.trim() || "Vorhanden (< 3 Monate)",
     employment:
       process.env.KA_CONTACT_EMPLOYMENT?.trim() || "Angestellte(r)",
-    income: process.env.KA_CONTACT_INCOME?.trim() || "4.000€ - 5.000€",
+    income: process.env.KA_CONTACT_INCOME?.trim() || "Über 5.000€",
     household:
       process.env.KA_CONTACT_HOUSEHOLD?.trim() || "Zweipersonenhaushalt",
     pets: process.env.KA_CONTACT_PETS?.trim() || "Keine",
