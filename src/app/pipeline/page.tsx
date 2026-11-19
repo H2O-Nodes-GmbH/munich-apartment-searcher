@@ -103,7 +103,7 @@ export default async function PipelinePage() {
 
         <CollapsibleSection
           title="Message template"
-          description="Used to draft the first message to a landlord. Placeholders: {{title}}, {{price}}, {{location}}, {{url}}."
+          description="Used to draft the first message to a landlord. Placeholders: {{title}}, {{price}}, {{location}}, {{url}}, {{hook}} (auto one-liner from listing keywords)."
         >
           <MessageTemplateEditor initialBody={template} />
         </CollapsibleSection>

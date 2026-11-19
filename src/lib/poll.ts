@@ -126,6 +126,7 @@ export async function pollActiveSearches(options?: {
         price_text: l.priceText,
         location: l.location,
         url: l.url,
+        description_snippet: l.descriptionSnippet,
       })),
     );
   }

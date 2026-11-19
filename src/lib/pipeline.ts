@@ -1,3 +1,4 @@
+import { buildMessageHook } from "@/lib/messageHook";
 import type { ListingStatus } from "@/lib/types";
 
 export type StageDef = {
@@ -94,7 +95,7 @@ export function fromBerlinInputValue(value: string): Date | null {
 
 export const DEFAULT_MESSAGE_TEMPLATE = `Hallo,
 
-wir haben Ihre Anzeige „{{title}}“ ({{price}}, {{location}}) gesehen und sind sehr interessiert.
+wir haben Ihre Anzeige „{{title}}“ ({{price}}, {{location}}) gesehen und sind sehr interessiert. {{hook}}
 
 Wir sind Max und Milena, ein berufstätiges Paar, und suchen ab Dezember/Januar eine Wohnung in München. Wir sind Nichtraucher, haben keine Haustiere und können alle Unterlagen (Gehaltsnachweise, SCHUFA, Mietschuldenfreiheit) sofort bereitstellen.
 
@@ -110,6 +111,7 @@ export function renderMessage(
     price_text: string | null;
     location: string | null;
     url: string;
+    description_snippet?: string | null;
   },
 ): string {
   const values: Record<string, string> = {
@@ -117,6 +119,7 @@ export function renderMessage(
     price: listing.price_text ?? "Preis auf Anfrage",
     location: listing.location ?? "München",
     url: listing.url,
+    hook: buildMessageHook(listing),
   };
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) =>
     key in values ? values[key] : match,

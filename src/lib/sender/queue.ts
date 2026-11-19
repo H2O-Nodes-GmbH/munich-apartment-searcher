@@ -19,7 +19,12 @@ export async function loadMessageTemplate(): Promise<string> {
 
 /** Queue freshly discovered, non-excluded listings for automatic messaging. */
 export async function queueListingsForSend(
-  listings: Array<Pick<ListingRow, "id" | "title" | "price_text" | "location" | "url">>,
+  listings: Array<
+    Pick<
+      ListingRow,
+      "id" | "title" | "price_text" | "location" | "url" | "description_snippet"
+    >
+  >,
 ): Promise<number> {
   if (listings.length === 0) return 0;
 

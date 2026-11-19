@@ -38,9 +38,8 @@ export async function GET(request: Request) {
     }
 
     const template = await loadMessageTemplate();
-    const message =
-      listing.message_body?.trim() ||
-      renderMessage(template, listing);
+    // Always render fresh so keyword hooks stay current for auto-send.
+    const message = renderMessage(template, listing);
 
     const result = await sendListingMessage({
       listingUrl: listing.url,
