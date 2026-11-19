@@ -57,7 +57,7 @@ const RULES: HookRule[] = [
   {
     id: "ebk",
     test: (h) => /\beinbauküche|\bebk\b|\bküche\s+(ist\s+)?vorhanden/i.test(h),
-    sentence: () => "Die Einbauküche ist für uns ein echtes Plus.";
+    sentence: () => "Die Einbauküche ist für uns ein echtes Plus.",
   },
   {
     id: "size",
@@ -70,7 +70,7 @@ const RULES: HookRule[] = [
   {
     id: "quiet",
     test: (h) => /\bruhig|\bruhelage|\bruhige\s+lage|\babseits/i.test(h),
-    sentence: () => "Die ruhige Lage spricht uns sehr an.";
+    sentence: () => "Die ruhige Lage spricht uns sehr an.",
   },
   {
     id: "central",
@@ -83,12 +83,12 @@ const RULES: HookRule[] = [
   {
     id: "bright",
     test: (h) => /\bhell|\bsonnig|\blichtdurchflutet|\bsüd/i.test(h),
-    sentence: () => "Dass die Wohnung hell wirkt, hat uns besonders angesprochen.";
+    sentence: () => "Dass die Wohnung hell wirkt, hat uns besonders angesprochen.",
   },
   {
     id: "altbau",
     test: (h) => /\baltbau|\bstuck|\bhohe\s+decken/i.test(h),
-    sentence: () => "Der Altbau-Charakter der Wohnung spricht uns sehr an.";
+    sentence: () => "Der Altbau-Charakter der Wohnung spricht uns sehr an.",
   },
   {
     id: "district",
