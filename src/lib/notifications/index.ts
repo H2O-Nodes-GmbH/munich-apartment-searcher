@@ -152,6 +152,77 @@ export function formatReplyMessage(input: {
     .join("\n");
 }
 
+export type SendSummaryListing = {
+  title: string;
+  location: string | null;
+  url: string;
+  sentAt: string;
+};
+
+export function formatSendSummaryMessage(input: {
+  listings: SendSummaryListing[];
+  pipelineUrl: string;
+  windowHours?: number;
+}): string {
+  const hours = input.windowHours ?? 24;
+  const header = `📬 <b>Daily send summary</b> (last ${hours}h)`;
+  const pipeline = `<a href="${escapeHtml(input.pipelineUrl)}">Open Pipeline</a>`;
+
+  if (input.listings.length === 0) {
+    return [header, "", "No landlord messages sent.", "", pipeline].join("\n");
+  }
+
+  const lines = input.listings.map((listing, index) => {
+    const loc = listing.location ? ` · ${escapeHtml(listing.location)}` : "";
+    const when = formatBerlinTime(listing.sentAt);
+    return `${index + 1}. <a href="${escapeHtml(listing.url)}">${escapeHtml(truncate(listing.title, 80))}</a>${loc}\n    <i>${escapeHtml(when)}</i>`;
+  });
+
+  let body = [header, "", `<b>${input.listings.length}</b> message${input.listings.length === 1 ? "" : "s"} sent:`, "", ...lines, "", pipeline].join(
+    "\n",
+  );
+
+  // Telegram hard limit is 4096; keep a little headroom.
+  if (body.length > 4000) {
+    const kept = [];
+    let used = header.length + 80 + pipeline.length;
+    for (const line of lines) {
+      if (used + line.length + 2 > 3800) break;
+      kept.push(line);
+      used += line.length + 2;
+    }
+    const omitted = input.listings.length - kept.length;
+    body = [
+      header,
+      "",
+      `<b>${input.listings.length}</b> messages sent:`,
+      "",
+      ...kept,
+      omitted > 0 ? `\n…and ${omitted} more` : null,
+      "",
+      pipeline,
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
+  }
+
+  return body;
+}
+
+function formatBerlinTime(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("de-DE", {
+      timeZone: "Europe/Berlin",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 export function formatForwardingCodeMessage(input: {
   code: string | null;
   confirmUrl?: string | null;

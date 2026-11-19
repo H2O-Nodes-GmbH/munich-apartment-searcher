@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
+import { appPipelineUrl } from "@/lib/appUrl";
 import { isAuthorized } from "@/lib/auth";
-import {
-  createNotifierFromEnv,
-} from "@/lib/notifications";
+import { createNotifierFromEnv } from "@/lib/notifications";
 import {
   claimNextQueuedListing,
   loadMessageTemplate,
@@ -48,26 +47,9 @@ export async function GET(request: Request) {
       message,
     });
 
-    const pipelineUrl = appPipelineUrl(request);
-    const linkLine = [
-      `<a href="${escapeHtml(listing.url)}">Listing</a>`,
-      `<a href="${escapeHtml(pipelineUrl)}">Pipeline</a>`,
-    ].join(" · ");
-
     if (result.ok) {
       await markListingSent(listing.id);
-      const notifier = createNotifierFromEnv();
-      await notifier?.notifyMessage(
-        [
-          "✅ <b>Message sent</b>",
-          escapeHtml(listing.title),
-          listing.location ? escapeHtml(listing.location) : null,
-          "",
-          linkLine,
-        ]
-          .filter((line) => line !== null)
-          .join("\n"),
-      );
+      // Successes are batched into the 11:00 Europe/Berlin daily summary cron.
       return NextResponse.json({
         ok: true,
         listingId: listing.id,
@@ -89,12 +71,9 @@ export async function GET(request: Request) {
       );
     }
 
-    // Only alert on blockers that need human action.
-    if (
-      result.reason === "login_required" ||
-      result.reason === "captcha" ||
-      result.reason === "form_changed"
-    ) {
+    // Immediate alerts only for blockers that need human action.
+    if (result.reason === "login_required" || result.reason === "captcha") {
+      const pipelineUrl = appPipelineUrl(request);
       const notifier = createNotifierFromEnv();
       await notifier?.notifyMessage(
         [
@@ -105,7 +84,10 @@ export async function GET(request: Request) {
             ? `Session: <code>${escapeHtml(result.sessionId)}</code>`
             : null,
           "",
-          linkLine,
+          [
+            `<a href="${escapeHtml(listing.url)}">Listing</a>`,
+            `<a href="${escapeHtml(pipelineUrl)}">Pipeline</a>`,
+          ].join(" · "),
         ]
           .filter((line) => line !== null)
           .join("\n"),
@@ -132,19 +114,4 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-/** Stable Pipeline URL for Telegram — prefer production host over ephemeral cron URL. */
-function appPipelineUrl(request: Request): string {
-  const configured =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.APP_URL?.trim() ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : null);
-  if (configured) {
-    return new URL("/pipeline", configured.endsWith("/") ? configured : `${configured}/`)
-      .toString();
-  }
-  return new URL("/pipeline", request.url).toString();
 }
