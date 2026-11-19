@@ -9,6 +9,7 @@ import {
   markListingSendSkipped,
   markListingSent,
 } from "@/lib/sender/queue";
+import { isSendPaused } from "@/lib/sender/sendPause";
 import { sendListingMessage } from "@/lib/sender/sendListingMessage";
 import { renderMessage } from "@/lib/pipeline";
 
@@ -22,6 +23,16 @@ export const maxDuration = 300;
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const pause = isSendPaused();
+  if (pause.paused) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: "Send paused",
+      until: pause.until?.toISOString() ?? null,
+    });
   }
 
   if (!process.env.BROWSERBASE_API_KEY || !process.env.BROWSERBASE_CONTEXT_ID) {

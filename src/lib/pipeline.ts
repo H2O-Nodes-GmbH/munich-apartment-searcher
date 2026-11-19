@@ -99,7 +99,7 @@ wir haben Ihre Anzeige „{{title}}“ ({{price}}, {{location}}) gesehen und sin
 
 Wir sind Max und Milena, ein berufstätiges Paar, und suchen ab Dezember/Januar eine Wohnung in München. Wir sind Nichtraucher, haben keine Haustiere und können alle Unterlagen (Gehaltsnachweise, SCHUFA, Mietschuldenfreiheit) sofort bereitstellen.
 
-Wir sind in den nächsten Wochen in München und würden die Wohnung sehr gerne besichtigen. Wann würde es Ihnen passen?
+Wir sind vom 7. bis 11. Dezember in München und würden die Wohnung in diesem Zeitraum sehr gerne besichtigen. Wann würde es Ihnen passen?
 
 Viele Grüße
 Max & Milena`;
