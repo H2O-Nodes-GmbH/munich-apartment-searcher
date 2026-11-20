@@ -103,6 +103,13 @@ export async function POST(request: Request) {
 
   if (isKleinanzeigenReply({ from, subject, text })) {
     const reply = parseReplyEmail({ subject, text });
+    if (!reply.senderName || !reply.message) {
+      console.warn("KA reply parsed partially", {
+        senderName: reply.senderName,
+        hasMessage: Boolean(reply.message),
+        textExcerpt: text.slice(0, 2000),
+      });
+    }
     const listing = await findListingForEmail(supabase, {
       adId: reply.adId,
       subject,

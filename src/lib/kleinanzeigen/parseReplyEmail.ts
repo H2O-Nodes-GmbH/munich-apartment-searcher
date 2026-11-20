@@ -37,7 +37,11 @@ export function parseReplyEmail(input: {
   subject: string;
   text: string;
 }): ParsedReplyEmail {
-  const text = input.text.replace(/\r\n/g, "\n");
+  const text = input.text
+    .replace(/\r\n/g, "\n")
+    .replace(/[\u00a0\u202f]/g, " ")
+    // Gmail's plain-text forwards wrap bold text in asterisks.
+    .replace(/\*([^*\n]+)\*/g, "$1");
 
   const adId =
     text.match(/Anzeigennummer:\s*(\d{6,})/)?.[1] ??
@@ -49,9 +53,9 @@ export function parseReplyEmail(input: {
 
   const replyMatch =
     text.match(
-      /Antwort von[ \t]+([^\n]+)\n([\s\S]*?)(?:Um auf diese Nachricht zu antworten|Beantworte diese Nachricht)/i,
+      /Antwort von\s+([^\n]+)\n([\s\S]*?)(?:Um auf diese Nachricht zu antworten|Beantworte diese Nachricht)/i,
     ) ??
-    text.match(/Antwort von[ \t]+([^\n]+)\n([\s\S]+)/i);
+    text.match(/Antwort von\s+([^\n]+)\n([\s\S]+)/i);
   const senderName = replyMatch?.[1]?.trim() || null;
   let message = replyMatch?.[2]?.trim() || null;
   if (message) {
