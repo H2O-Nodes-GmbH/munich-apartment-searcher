@@ -3,6 +3,7 @@ import type { NotifiableListing } from "@/lib/notifications";
 import { scrapeListingDetails, scrapeSearchUrl } from "@/lib/scraper";
 import type { ParsedListing } from "@/lib/scraper/types";
 import { queueListingsForSend } from "@/lib/sender/queue";
+import { isSendPaused } from "@/lib/sender/sendPause";
 import {
   isSellerAccountTooNew,
   NEW_SELLER_EXCLUDE_TERM,
@@ -117,9 +118,11 @@ export async function pollActiveSearches(options?: {
   }
 
   // Enrich details / drop brand-new seller accounts, then auto-queue sends.
+  // While paused, don't queue: a backlog would all go out stale on resume.
   if (newlyInserted.length > 0) {
     const kept = await enrichAndFilterSellers(newlyInserted);
     summary.excludedNew += newlyInserted.length - kept.length;
+    if (isSendPaused().paused) return summary;
     summary.queued = await queueListingsForSend(
       kept.map((l) => ({
         id: l.id,
