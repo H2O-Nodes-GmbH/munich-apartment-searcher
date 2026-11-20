@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["playwright-core", "@browserbasehq/sdk"],
   outputFileTracingIncludes: {
     "/api/cron/send": ["./node_modules/playwright-core/**"],
+    "/api/cron/poll": ["./node_modules/playwright-core/**"],
     "/api/sender/login-session": ["./node_modules/playwright-core/**"],
     "/api/sender/login-session/complete": ["./node_modules/playwright-core/**"],
   },

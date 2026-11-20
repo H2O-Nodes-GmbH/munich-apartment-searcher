@@ -58,32 +58,72 @@ export async function queueListingsForSend(
   return queued;
 }
 
-export async function claimNextQueuedListing(): Promise<ListingRow | null> {
+/** A "sending" row older than this belongs to a run that died mid-send. */
+const STALE_SENDING_MS = 5 * 60 * 1000;
+
+/**
+ * Claim the next queued listing, unless another runner is mid-send
+ * (one Browserbase context can't safely drive two sessions).
+ * While sending, sent_at holds the claim time.
+ */
+export async function acquireSendSlot(): Promise<
+  { kind: "claimed"; listing: ListingRow } | { kind: "busy" } | { kind: "empty" }
+> {
   const supabase = getServiceSupabase();
+  const staleBefore = new Date(Date.now() - STALE_SENDING_MS).toISOString();
+
+  const { data: sending, error: sendingError } = await supabase
+    .from("listings")
+    .select("id,sent_at")
+    .eq("send_status", "sending");
+  if (sendingError) throw new Error(sendingError.message);
+
+  for (const row of sending ?? []) {
+    if (row.sent_at && row.sent_at > staleBefore) return { kind: "busy" };
+    // Don't retry: the message may have gone out before the run died.
+    await markListingSendFailed(row.id as string, "interrupted: send run ended mid-send");
+  }
 
   const { data: next, error } = await supabase
     .from("listings")
-    .select("*")
+    .select("id")
     .eq("send_status", "queued")
     .eq("is_excluded", false)
-    .order("first_seen_at", { ascending: true })
+    .order("first_seen_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-
   if (error) throw new Error(error.message);
-  if (!next) return null;
+  if (!next) return { kind: "empty" };
 
-  const listing = next as ListingRow;
   const { data: claimed, error: claimError } = await supabase
     .from("listings")
-    .update({ send_status: "sending" satisfies SendStatus })
-    .eq("id", listing.id)
+    .update({
+      send_status: "sending" satisfies SendStatus,
+      sent_at: new Date().toISOString(),
+    })
+    .eq("id", next.id)
     .eq("send_status", "queued")
     .select("*")
     .maybeSingle();
-
   if (claimError) throw new Error(claimError.message);
-  return (claimed as ListingRow | null) ?? null;
+  if (!claimed) return { kind: "busy" };
+
+  // Two runners can claim in the same instant; the earliest claim wins.
+  const { data: racing } = await supabase
+    .from("listings")
+    .select("id,sent_at")
+    .eq("send_status", "sending")
+    .order("sent_at", { ascending: true })
+    .order("id", { ascending: true });
+  if ((racing ?? []).length > 1 && racing?.[0]?.id !== claimed.id) {
+    await supabase
+      .from("listings")
+      .update({ send_status: "queued" satisfies SendStatus, sent_at: null })
+      .eq("id", claimed.id);
+    return { kind: "busy" };
+  }
+
+  return { kind: "claimed", listing: claimed as ListingRow };
 }
 
 export async function markListingSent(listingId: string): Promise<void> {
@@ -118,6 +158,7 @@ export async function markListingSendFailed(
     .update({
       send_status: "failed" satisfies SendStatus,
       send_error: detail.slice(0, 1000),
+      sent_at: null,
     })
     .eq("id", listingId);
 
@@ -140,6 +181,7 @@ export async function markListingSendSkipped(
     .update({
       send_status: "skipped" satisfies SendStatus,
       send_error: detail.slice(0, 1000),
+      sent_at: null,
     })
     .eq("id", listingId);
 

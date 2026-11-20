@@ -1,5 +1,5 @@
 import { matchExcludeTerms } from "@/lib/exclude";
-import type { NotifiableListing } from "@/lib/notifications";
+import { createNotifierFromEnv, type NotifiableListing } from "@/lib/notifications";
 import { scrapeListingDetails, scrapeSearchUrl } from "@/lib/scraper";
 import type { ParsedListing } from "@/lib/scraper/types";
 import { queueListingsForSend } from "@/lib/sender/queue";
@@ -73,6 +73,7 @@ export async function pollActiveSearches(options?: {
           name: config.name,
           error: `Likely blocked or empty page (HTTP ${result.status})`,
         });
+        await alertIfBlockedTooLong(config, result.status);
         continue;
       }
 
@@ -136,6 +137,25 @@ export async function pollActiveSearches(options?: {
   }
 
   return summary;
+}
+
+/** last_polled_at only advances on success, so its age is how long scans have failed. */
+const BLOCKED_ALERT_AFTER_MS = 10 * 60 * 1000;
+/** Scans run every 30s; this window catches exactly one of them. */
+const BLOCKED_ALERT_WINDOW_MS = 30 * 1000;
+
+async function alertIfBlockedTooLong(config: SearchConfigRow, status: number): Promise<void> {
+  if (!config.last_polled_at) return;
+  const failingFor = Date.now() - new Date(config.last_polled_at).getTime();
+  if (failingFor < BLOCKED_ALERT_AFTER_MS) return;
+  if (failingFor >= BLOCKED_ALERT_AFTER_MS + BLOCKED_ALERT_WINDOW_MS) return;
+  try {
+    await createNotifierFromEnv()?.notifyMessage(
+      `⚠️ <b>Kleinanzeigen search blocked</b>\nNo successful scan for 10 min (HTTP ${status}). New listings aren't being found.`,
+    );
+  } catch (err) {
+    console.error("Failed to send blocked alert:", err);
+  }
 }
 
 type PendingNotify = NotifiableListing & {
