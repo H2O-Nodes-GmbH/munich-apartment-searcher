@@ -443,17 +443,12 @@ export async function sendListingMessage(input: {
       };
     }
 
-    // Dialog closed after send is a good signal for the new UI.
-    if (formKind === "profile" && (await page.locator("dialog[open]").count()) === 0) {
-      return { ok: true, sessionId };
-    }
-
-    await page.waitForTimeout(2_000);
-    if (await looksSuccessful()) {
-      return { ok: true, sessionId };
-    }
-    if (formKind === "profile" && (await page.locator("dialog[open]").count()) === 0) {
-      return { ok: true, sessionId };
+    // A closed dialog is not proof of delivery; only the explicit success text is.
+    for (let i = 0; i < 4; i++) {
+      await page.waitForTimeout(1_500);
+      if (await looksSuccessful()) {
+        return { ok: true, sessionId };
+      }
     }
 
     return {

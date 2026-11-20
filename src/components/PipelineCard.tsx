@@ -180,7 +180,9 @@ export function PipelineCard({
                   ? `→ ${event.detail}`
                   : event.kind === "reply"
                     ? `💬 ${event.detail}`
-                    : event.detail}
+                    : event.kind === "send_confirmed"
+                      ? `✅ ${event.detail}`
+                      : event.detail}
               </li>
             ))}
           </ul>
