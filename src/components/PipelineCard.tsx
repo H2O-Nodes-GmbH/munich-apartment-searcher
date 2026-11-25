@@ -133,6 +133,34 @@ export function PipelineCard({
         </details>
       ) : null}
 
+      {listing.send_status === "sent" && listing.message_body ? (
+        <details className="rounded-md bg-stone-50 p-2">
+          <summary className="cursor-pointer text-xs font-medium">
+            Sent message
+            {listing.sent_at
+              ? ` · ${new Date(listing.sent_at).toLocaleString("de-DE", {
+                  timeZone: APP_TIME_ZONE,
+                  weekday: "short",
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}`
+              : ""}
+          </summary>
+          <div className="mt-2 flex flex-col gap-2">
+            <p className="text-[11px] text-muted">
+              {events.some((event) => event.kind === "send_confirmed")
+                ? "✅ Delivery confirmed by email"
+                : "Sent via Kleinanzeigen · no confirmation email (normal for private landlords)"}
+            </p>
+            <p className="whitespace-pre-wrap break-words rounded-md border border-black/10 bg-white px-2 py-1.5 text-xs leading-relaxed">
+              {listing.message_body}
+            </p>
+          </div>
+        </details>
+      ) : null}
+
       <details className="rounded-md bg-stone-50 p-2">
         <summary className="cursor-pointer text-xs font-medium">
           Notes & viewing{listing.notes ? " •" : ""}

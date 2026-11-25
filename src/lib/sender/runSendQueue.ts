@@ -55,7 +55,7 @@ export async function runSendQueue(options: {
     const send = await sendListingMessage({ listingUrl: listing.url, message });
 
     if (send.ok) {
-      await markListingSent(listing.id);
+      await markListingSent(listing.id, message);
       result.sent += 1;
       continue;
     }

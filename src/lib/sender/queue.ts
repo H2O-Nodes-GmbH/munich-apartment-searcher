@@ -126,12 +126,16 @@ export async function acquireSendSlot(): Promise<
   return { kind: "claimed", listing: claimed as ListingRow };
 }
 
-export async function markListingSent(listingId: string): Promise<void> {
+export async function markListingSent(
+  listingId: string,
+  sentMessage: string,
+): Promise<void> {
   const supabase = getServiceSupabase();
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("listings")
     .update({
+      message_body: sentMessage,
       send_status: "sent" satisfies SendStatus,
       send_error: null,
       sent_at: now,
