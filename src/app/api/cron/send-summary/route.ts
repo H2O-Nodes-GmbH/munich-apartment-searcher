@@ -4,7 +4,9 @@ import { isAuthorized } from "@/lib/auth";
 import {
   createNotifierFromEnv,
   formatSendSummaryMessage,
+  type NotMessagedCounts,
 } from "@/lib/notifications";
+import { isSendPaused } from "@/lib/sender/sendPause";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -73,8 +75,47 @@ export async function GET(request: Request) {
         sentAt: row.sent_at,
       }));
 
+    const { data: found, error: foundError } = await supabase
+      .from("listings")
+      .select("send_status, first_seen_at")
+      .eq("is_excluded", false)
+      .gte("first_seen_at", since);
+    if (foundError) {
+      return NextResponse.json({ ok: false, error: foundError.message }, { status: 500 });
+    }
+
+    const notMessaged: NotMessagedCounts = {
+      paused: 0,
+      notQueued: 0,
+      queued: 0,
+      failed: 0,
+      gone: 0,
+    };
+    for (const row of found ?? []) {
+      switch (row.send_status) {
+        case "sent":
+          break;
+        case "queued":
+        case "sending":
+          notMessaged.queued += 1;
+          break;
+        case "failed":
+          notMessaged.failed += 1;
+          break;
+        case "skipped":
+          notMessaged.gone += 1;
+          break;
+        default:
+          if (isSendPaused(new Date(row.first_seen_at as string)).paused) {
+            notMessaged.paused += 1;
+          } else {
+            notMessaged.notQueued += 1;
+          }
+      }
+    }
+
     const pipelineUrl = appPipelineUrl(request);
-    const text = formatSendSummaryMessage({ listings, pipelineUrl });
+    const text = formatSendSummaryMessage({ listings, pipelineUrl, notMessaged });
     const notifier = createNotifierFromEnv();
     if (notifier) {
       await notifier.notifyMessage(text);

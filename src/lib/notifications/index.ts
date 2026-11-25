@@ -159,17 +159,47 @@ export type SendSummaryListing = {
   sentAt: string;
 };
 
+/** Relevant (non-excluded) listings first seen in the window that weren't messaged. */
+export type NotMessagedCounts = {
+  paused: number;
+  notQueued: number;
+  queued: number;
+  failed: number;
+  gone: number;
+};
+
+function formatNotMessaged(counts: NotMessagedCounts | undefined): string | null {
+  if (!counts) return null;
+  const total =
+    counts.paused + counts.notQueued + counts.queued + counts.failed + counts.gone;
+  if (total === 0) return null;
+  const reasons = [
+    counts.paused > 0 ? `${counts.paused} while sending was paused` : null,
+    counts.notQueued > 0 ? `${counts.notQueued} not queued` : null,
+    counts.queued > 0 ? `${counts.queued} still queued` : null,
+    counts.failed > 0 ? `${counts.failed} failed to send` : null,
+    counts.gone > 0 ? `${counts.gone} already taken down` : null,
+  ].filter(Boolean);
+  const noun = total === 1 ? "relevant listing" : "relevant listings";
+  return `🔎 ${total} ${noun} found but not messaged (${reasons.join(", ")})`;
+}
+
 export function formatSendSummaryMessage(input: {
   listings: SendSummaryListing[];
   pipelineUrl: string;
+  notMessaged?: NotMessagedCounts;
   windowHours?: number;
 }): string {
   const hours = input.windowHours ?? 24;
   const header = `📬 <b>Daily send summary</b> (last ${hours}h)`;
   const pipeline = `🗂️ <a href="${escapeHtml(input.pipelineUrl)}">Open Pipeline</a>`;
+  const notMessaged = formatNotMessaged(input.notMessaged);
+  const footer = [notMessaged, notMessaged ? "" : null, pipeline].filter(
+    (line): line is string => line !== null,
+  );
 
   if (input.listings.length === 0) {
-    return [header, "", "No landlord messages sent.", "", pipeline].join("\n");
+    return [header, "", "No landlord messages sent.", "", ...footer].join("\n");
   }
 
   const lines = input.listings.map((listing, index) => {
@@ -177,12 +207,12 @@ export function formatSendSummaryMessage(input: {
     return `${index + 1}. <a href="${escapeHtml(listing.url)}">${escapeHtml(truncate(listing.title, 80))}</a>${loc}`;
   });
 
-  let body = [header, "", ...lines, "", pipeline].join("\n");
+  let body = [header, "", ...lines, "", ...footer].join("\n");
 
   // Telegram hard limit is 4096; keep a little headroom.
   if (body.length > 4000) {
     const kept = [];
-    let used = header.length + pipeline.length + 10;
+    let used = header.length + footer.join("\n").length + 10;
     for (const line of lines) {
       if (used + line.length + 2 > 3800) break;
       kept.push(line);
@@ -195,7 +225,7 @@ export function formatSendSummaryMessage(input: {
       ...kept,
       omitted > 0 ? `…and ${omitted} more` : null,
       "",
-      pipeline,
+      ...footer,
     ]
       .filter((line) => line !== null)
       .join("\n");
