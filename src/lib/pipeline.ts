@@ -97,9 +97,11 @@ export const DEFAULT_MESSAGE_TEMPLATE = `Hallo,
 
 wir haben Ihre Anzeige „{{title}}“ ({{price}}, {{location}}) gesehen und sind sehr interessiert. {{hook}}
 
-Wir sind Max und Milena, ein berufstätiges Paar, und suchen ab Dezember/Januar eine Wohnung in München. Wir sind Nichtraucher, haben keine Haustiere und können alle Unterlagen (Gehaltsnachweise, SCHUFA, Mietschuldenfreiheit) sofort bereitstellen.
+Wir sind Max und Milena, ein berufstätiges Paar, beide 30 Jahre alt, und suchen ab sofort eine Wohnung in München. Milena ist aktuell noch an der Charité - Berlin in der Forschung beschäftigt und beginnt im neuen Jahr ihre Stelle als Postdoktorandin am Helmholtz Zentrum in München. Max ist als Unternehmer im IT-Bereich tätig. Wir sind Nichtraucher, haben keine Kinder, keine Haustiere und können alle Unterlagen (Gehaltsnachweise, SCHUFA, Mietschuldenfreiheit) sofort bereitstellen.
 
-Wir sind vom 7. bis 11. Dezember in München und würden die Wohnung in diesem Zeitraum sehr gerne besichtigen. Wann würde es Ihnen passen?
+Wir sind vom 07.-11.12. in München und würden die Wohnung sehr gerne besichtigen.
+
+Wir würden uns sehr über eine Rückmeldung freuen!
 
 Viele Grüße
 Max & Milena`;

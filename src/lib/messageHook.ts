@@ -16,7 +16,7 @@ type HookRule = {
   sentence: (listing: HookListing, haystack: string) => string;
 };
 
-const FALLBACK = "Der Zuschnitt und die Lage wirken sehr gut für uns.";
+const FALLBACK = "Der Schnitt der Wohnung und die Lage wirken besonders ansprechend auf uns.";
 
 function districtFromLocation(location: string | null | undefined): string | null {
   if (!location?.trim()) return null;
