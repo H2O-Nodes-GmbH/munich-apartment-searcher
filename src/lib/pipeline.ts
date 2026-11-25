@@ -123,7 +123,10 @@ export function renderMessage(
     url: listing.url,
     hook: buildMessageHook(listing),
   };
-  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) =>
-    key in values ? values[key] : match,
-  );
+  return template
+    .replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) =>
+      key in values ? values[key] : match,
+    )
+    // Kleinanzeigen inserts zero-width break hints into location names.
+    .replace(/[\u200b-\u200d\u2060\ufeff]/g, "");
 }
